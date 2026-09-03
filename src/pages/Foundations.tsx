@@ -615,7 +615,7 @@ export default function Foundations() {
       <div className="card intro" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <p style={{ margin: 0 }}>
-            Hệ thống 26 khái niệm sắp xếp tuần tự theo lộ trình học từ <b>1 đến 26</b>: Mô hình tư duy ➔ Nạp dữ liệu ➔ Lưu trữ ➔ Làm sạch ➔ Biến đổi ➔ Cổng kiểm soát.
+            Hệ thống khái niệm sắp xếp tuần tự theo lộ trình học từ: Mô hình tư duy ➔ Nạp dữ liệu ➔ Lưu trữ ➔ Làm sạch ➔ Biến đổi ➔ Cổng kiểm soát.
           </p>
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn ghost sm" onClick={handleExportJSON}>📥 Xuất JSON</button>

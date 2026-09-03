@@ -3,7 +3,16 @@ import { Empty } from '../components/ui'
 
 export interface ConceptItem {
   id: string
-  subject: 'Pipeline Lifecycle' | 'SQL & Engine' | 'Storage & Pruning' | 'Cleansing' | 'Complex Types' | 'Quality Gate'
+  subject:
+    | 'Pipeline Lifecycle'
+    | 'SQL & Engine'
+    | 'Storage & Pruning'
+    | 'Cleansing'
+    | 'Complex Types'
+    | 'Quality Gate'
+    | 'SQL Fundamentals'
+    | 'Data Modeling'
+    | 'Reliability & Ops'
   term: string              // Thuật ngữ / Khái niệm chính
   pronounceOrType?: string  // Phân loại kỹ thuật / Bước thực thi
   formulaOrSyntax: string   // Công thức / Cú pháp chuẩn
@@ -350,8 +359,113 @@ export const DEFAULT_CONCEPTS: ConceptItem[] = [
       "text": "DuckDB Documentation",
       "url": "https://duckdb.org/docs/"
     }
+  },
+  {
+    "id": "c_null_three_valued",
+    "subject": "SQL Fundamentals",
+    "term": "27. Three-Valued Logic (NULL semantics)",
+    "pronounceOrType": "Logic ba trị: TRUE / FALSE / UNKNOWN",
+    "definition": "SQL không dùng logic hai trị như Python. Mọi phép so sánh với NULL trả về UNKNOWN, và WHERE chỉ giữ dòng khi điều kiện là TRUE — UNKNOWN bị loại y hệt FALSE. Đây là nguồn gốc của phần lớn lỗi đếm sai trong data engineering, và nó đúng ở mọi engine SQL.",
+    "formulaOrSyntax": "NULL = NULL              ➔ UNKNOWN  (không phải TRUE!)\nNULL <> 'a'              ➔ UNKNOWN  (không phải TRUE!)\nstatus NOT IN ('a','b')  ➔ UNKNOWN khi status IS NULL\n\n-- Cách đúng:\nWHERE status IS NULL OR status NOT IN ('a','b')\nWHERE col IS DISTINCT FROM other    -- so sánh coi NULL = NULL\n\n-- count() cũng phân biệt:\ncount(*)    ➔ đếm mọi dòng\ncount(col)  ➔ BỎ QUA dòng có col IS NULL",
+    "pitfall": "Viết WHERE status NOT IN (...) để bắt giá trị rác: dòng có status NULL trả về UNKNOWN nên LỌT QUA bộ lọc. Rác đi thẳng vào core trong khi check báo 0 lỗi.",
+    "sourceLink": {
+      "text": "DuckDB — NULL values",
+      "url": "https://duckdb.org/docs/sql/data_types/nulls"
+    }
+  },
+  {
+    "id": "c_window_vs_groupby",
+    "subject": "SQL Fundamentals",
+    "term": "28. Window Function vs GROUP BY",
+    "pronounceOrType": "Gom nhóm mà KHÔNG làm sụp dòng",
+    "definition": "GROUP BY gộp N dòng thành 1. Window function tính trên nhóm nhưng GIỮ NGUYÊN N dòng, thêm kết quả thành một cột. Đây là công cụ cho: chọn bản mới nhất mỗi khoá, xếp hạng, running total, và so một dòng với trung bình nhóm của chính nó.",
+    "formulaOrSyntax": "-- Chọn bản mới nhất mỗi khoá (latest-wins dedupe):\nSELECT * EXCLUDE (rn) FROM (\n  SELECT *, row_number() OVER (\n    PARTITION BY order_id ORDER BY updated_at DESC) AS rn\n  FROM staging.orders\n) WHERE rn = 1;\n\n-- So một dòng với trung bình nhóm của nó (GROUP BY không làm được):\nSELECT store_id, order_total,\n       avg(order_total) OVER (PARTITION BY store_id) AS store_avg\nFROM orders;\n\n-- Running total theo thời gian:\nsum(total) OVER (ORDER BY order_ts ROWS UNBOUNDED PRECEDING)\n\n-- Khi có giá trị bằng nhau, ba hàm cho ba kết quả khác nhau:\nrow_number ➔ 1,2,3,4    rank ➔ 1,2,2,4    dense_rank ➔ 1,2,2,3",
+    "pitfall": "Dùng GROUP BY + max(updated_at) để dedupe: bạn lấy được thời điểm mới nhất, nhưng các cột KHÁC lại lấy từ dòng bất kỳ trong nhóm — dữ liệu bị trộn giữa hai phiên bản.",
+    "sourceLink": {
+      "text": "DuckDB — Window functions",
+      "url": "https://duckdb.org/docs/sql/functions/window_functions"
+    }
+  },
+  {
+    "id": "c_grain_declaration",
+    "subject": "Data Modeling",
+    "term": "29. Grain Declaration & Uniqueness Proof",
+    "pronounceOrType": "Quyết định thiết kế ĐẦU TIÊN của mỗi bảng",
+    "definition": "Grain là câu trả lời cho \"MỘT DÒNG của bảng này là cái gì\", viết trong đúng một câu, trước cả việc chọn cột. Và grain không phải lời hứa suông: nó phải chứng minh được bằng một truy vấn kiểm tra tính duy nhất của khoá.",
+    "formulaOrSyntax": "-- Ghi grain thành comment ngay trên DDL:\n-- grain: one row = one order (latest version in this file)\nCREATE TABLE staging.orders AS ...\n\n-- grain: one row = one store per order_date\nCREATE TABLE core.daily_store_sales AS ...\n\n-- CHỨNG MINH grain: khoá phải duy nhất, kết quả PHẢI rỗng\nSELECT order_date, store_id, count(*)\nFROM core.daily_store_sales\nGROUP BY 1, 2 HAVING count(*) > 1;",
+    "pitfall": "Hai bảng tên gần giống nhưng khác grain (orders_raw = một PHIÊN BẢN đơn hàng; orders = một ĐƠN HÀNG). Nối chúng rồi cộng tiền là đếm trùng doanh thu mà không lỗi nào báo.",
+    "sourceLink": {
+      "text": "Kimball Group — Dimensional modeling techniques",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"
+    }
+  },
+  {
+    "id": "c_scd_type2",
+    "subject": "Data Modeling",
+    "term": "30. Slowly Changing Dimension (Type 1 vs Type 2)",
+    "pronounceOrType": "Attribute thay đổi theo thời gian",
+    "definition": "Khách hàng chuyển từ VN sang US. Báo cáo doanh thu năm ngoái nên tính họ là VN hay US? Type 1 ghi đè (mất lịch sử, đơn giản). Type 2 thêm dòng mới kèm khoảng hiệu lực (giữ lịch sử, join phức tạp hơn). Đây là câu hỏi bạn sẽ gặp ở mọi dự án có dimension.",
+    "formulaOrSyntax": "-- Type 1: ghi đè, chỉ biết hiện tại\nUPDATE dim_customer SET country = 'US' WHERE customer_id = 42;\n\n-- Type 2: thêm dòng, giữ lịch sử\ncustomer_sk | customer_id | country | valid_from | valid_to   | is_current\n        101 |          42 | VN      | 2020-01-01 | 2026-03-15 | false\n        102 |          42 | US      | 2026-03-15 | 9999-12-31 | true\n\n-- Join theo THỜI ĐIỂM SỰ KIỆN, không phải theo hiện tại:\nJOIN dim_customer d ON f.customer_id = d.customer_id\n  AND f.order_ts >= d.valid_from\n  AND f.order_ts <  d.valid_to",
+    "pitfall": "Dùng Type 1 rồi ngạc nhiên vì báo cáo cũ tự đổi số mỗi lần chạy lại. Nếu nghiệp vụ cần \"doanh thu theo quốc gia TẠI THỜI ĐIỂM đặt hàng\" thì bắt buộc Type 2 — và không sửa ngược được sau khi đã mất lịch sử.",
+    "sourceLink": {
+      "text": "Kimball Group — Slowly changing dimensions",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"
+    }
+  },
+  {
+    "id": "c_surrogate_key",
+    "subject": "Data Modeling",
+    "term": "31. Natural Key vs Surrogate Key",
+    "pronounceOrType": "Ai là người cấp khoá",
+    "definition": "Natural key do nguồn cấp (order_id từ hệ thống upstream) — miễn phí và có ý nghĩa, nhưng nằm NGOÀI tầm kiểm soát của bạn. Surrogate key do warehouse tự sinh — vô nghĩa với người dùng nhưng bạn làm chủ hoàn toàn. Với SCD Type 2, surrogate key trở thành bắt buộc.",
+    "formulaOrSyntax": "-- Natural key: nguồn cấp, có thể đổi format bất cứ lúc nào\norder_id BIGINT      -- upstream đổi sang 'ORD-000123' ➔ warehouse vỡ\n\n-- Surrogate key: warehouse tự sinh\nCREATE SEQUENCE seq_customer_sk;\ncustomer_sk BIGINT DEFAULT nextval('seq_customer_sk')\n\n-- Hash key: tất định, sinh lại được, không cần sequence\nmd5(source_system || '|' || CAST(natural_key AS VARCHAR)) AS row_key",
+    "pitfall": "Với SCD Type 2, natural key KHÔNG còn duy nhất — một customer_id có nhiều dòng lịch sử. Join bằng natural key sẽ fan-out và nhân doanh thu lên theo số lần khách hàng đó đổi thông tin.",
+    "sourceLink": {
+      "text": "Kimball Group — Dimensional modeling techniques",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"
+    }
+  },
+  {
+    "id": "c_atomic_swap",
+    "subject": "Reliability & Ops",
+    "term": "32. Atomic Swap (Build ➔ Rename)",
+    "pronounceOrType": "Không để ai đọc thấy trạng thái nửa vời",
+    "definition": "Trong lúc bạn dựng lại một bảng, người dùng vẫn đang query nó. TRUNCATE rồi INSERT tạo ra cửa sổ vài phút mà bảng rỗng hoặc thiếu dữ liệu. Cách đúng: dựng bảng mới HOÀN CHỈNH ở tên tạm, rồi đổi tên — thao tác đổi tên là nguyên tử.",
+    "formulaOrSyntax": "-- SAI: có cửa sổ bảng rỗng\nTRUNCATE core.orders;\nINSERT INTO core.orders SELECT ...;   -- 3 phút bảng thiếu dữ liệu\n\n-- ĐÚNG: build ➔ swap\nCREATE OR REPLACE TABLE core.orders_new AS SELECT ...;\nBEGIN;\n  DROP TABLE IF EXISTS core.orders_old;\n  ALTER TABLE core.orders     RENAME TO orders_old;\n  ALTER TABLE core.orders_new RENAME TO orders;\nCOMMIT;\n-- orders_old giữ lại làm bản rollback tức thì",
+    "pitfall": "Chỉ nghĩ tới bảng đích mà quên các thứ phụ thuộc: view, index, hoặc mart đang đọc từ nó. Swap xong phải kiểm tra chúng còn trỏ đúng chỗ.",
+    "sourceLink": {
+      "text": "DuckDB — ALTER TABLE",
+      "url": "https://duckdb.org/docs/sql/statements/alter_table"
+    }
+  },
+  {
+    "id": "c_orchestration",
+    "subject": "Reliability & Ops",
+    "term": "33. Orchestration & DAG",
+    "pronounceOrType": "Ai chạy job, theo thứ tự nào, khi nào",
+    "definition": "Pipeline thật gồm nhiều bước phụ thuộc nhau. DAG (đồ thị có hướng không chu trình) mô tả thứ tự đó. Orchestrator lo bốn việc mà một script tự viết không có: lịch chạy, thử lại khi lỗi, chạy song song nhánh độc lập, và báo động khi hỏng.",
+    "formulaOrSyntax": "extract ➔ contract_gate ➔ stage ➔ validate ➔ load_core ➔ build_marts\n                                        ↘ quarantine\n\n# Bốn thứ orchestrator lo hộ:\n#  1. schedule    — 02:00 UTC mỗi ngày\n#  2. retry       — lỗi mạng thử lại 3 lần, cách 5 phút\n#  3. dependency  — build_marts chỉ chạy khi load_core xong\n#  4. alerting    — job fail ➔ báo động ngay, không đợi ai phát hiện\n\n# Công cụ phổ biến: Airflow, Dagster, Prefect",
+    "pitfall": "Dùng cron thay orchestrator: cron không biết bước trước đã xong chưa, không thử lại, không báo động, và không trả lời được câu \"job hôm qua có chạy không\".",
+    "sourceLink": {
+      "text": "Airflow — Core concepts",
+      "url": "https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/index.html"
+    }
+  },
+  {
+    "id": "c_benchmark_hygiene",
+    "subject": "SQL & Engine",
+    "term": "34. Benchmark Hygiene (Cold vs Warm)",
+    "pronounceOrType": "Luật đo hiệu năng",
+    "definition": "Lần đọc file đầu tiên trả giá đĩa; lần thứ hai lấy từ OS page cache và nhanh hơn nhiều dù code không đổi một dòng. So một lần chạy nguội với một lần chạy ấm cho ra kết luận không chỉ thiếu chính xác mà còn NGƯỢC HẲN.",
+    "formulaOrSyntax": "def timed(sql, runs=3):\n    times = []\n    for _ in range(runs):\n        t0 = time.perf_counter()\n        con.execute(sql).fetchall()\n        times.append(time.perf_counter() - t0)\n    return statistics.median(times)   # bỏ lần đầu, lấy trung vị\n\n-- Đọc kế hoạch thực thi thay vì đoán:\nEXPLAIN         SELECT ...;   -- engine ĐỊNH làm gì\nEXPLAIN ANALYZE SELECT ...;   -- engine ĐÃ làm gì, kèm thời gian từng bước",
+    "pitfall": "Tối ưu theo cảm giác: sửa query rồi thấy nhanh hơn nên kết luận là sửa đúng, trong khi thật ra chỉ là lần chạy thứ hai. Luôn chạy nhiều lần, lấy trung vị, và đọc EXPLAIN.",
+    "sourceLink": {
+      "text": "DuckDB — EXPLAIN ANALYZE",
+      "url": "https://duckdb.org/docs/guides/meta/explain_analyze"
+    }
   }
 ]
+
 
 const STORAGE_KEY = 'lab-log:foundations:concepts'
 const MASTERED_KEY = 'lab-log:foundations:mastered'
@@ -448,15 +562,26 @@ export default function Foundations() {
   }
 
   const handleResetDefault = () => {
-    if (confirm('Khôi phục danh sách 26 khái niệm gốc theo đúng thứ tự logic (1 - 26)? Mọi thay đổi trước đó sẽ được làm mới.')) {
+    if (confirm('Khôi phục danh sách 34 khái niệm gốc theo đúng thứ tự logic (1 - 34)? Mọi thay đổi trước đó sẽ được làm mới.')) {
       setConcepts(DEFAULT_CONCEPTS)
       setPage(1)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_CONCEPTS))
-      alert('Đã khôi phục danh sách chuẩn từ 1 đến 26.')
+      alert('Đã khôi phục danh sách chuẩn từ 1 đến 34.')
     }
   }
 
-  const subjects = ['ALL', 'Pipeline Lifecycle', 'SQL & Engine', 'Storage & Pruning', 'Cleansing', 'Complex Types', 'Quality Gate']
+  const subjects = [
+    'ALL',
+    'Pipeline Lifecycle',
+    'SQL & Engine',
+    'Storage & Pruning',
+    'Cleansing',
+    'Complex Types',
+    'Quality Gate',
+    'SQL Fundamentals',
+    'Data Modeling',
+    'Reliability & Ops',
+  ]
 
   const filtered = useMemo(() => {
     return concepts.filter((c) => {

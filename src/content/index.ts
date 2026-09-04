@@ -7,6 +7,7 @@ import { a03 } from './a03'
 import { a04 } from './a04'
 import { a05 } from './a05'
 import { a06 } from './a06'
+import { a07 } from './a07'
 
 /**
  * MỞ MỘT BÀI MỚI:
@@ -32,9 +33,7 @@ export const assignments: AssignmentSpec[] = [
   a04,
   a05,
   a06,
-  locked('A07', 'Idempotency', 'Tính bất biến khi chạy lại',
-    'Run it ten times, get exactly one result.',
-    'Chạy mười lần vẫn ra đúng một kết quả.'),
+  a07,
   locked('A08', 'Load strategies', 'Chiến lược nạp dữ liệu',
     'Full versus incremental, and the late-arrival window.',
     'Nạp toàn bộ hay nạp tăng dần, và cửa sổ chờ dữ liệu trễ.'),

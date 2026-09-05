@@ -8,6 +8,7 @@ import { a04 } from './a04'
 import { a05 } from './a05'
 import { a06 } from './a06'
 import { a07 } from './a07'
+import { a08 } from './a08'
 
 /**
  * MỞ MỘT BÀI MỚI:
@@ -34,9 +35,7 @@ export const assignments: AssignmentSpec[] = [
   a05,
   a06,
   a07,
-  locked('A08', 'Load strategies', 'Chiến lược nạp dữ liệu',
-    'Full versus incremental, and the late-arrival window.',
-    'Nạp toàn bộ hay nạp tăng dần, và cửa sổ chờ dữ liệu trễ.'),
+  a08,
   locked('A09', 'Atomic swap', 'Hoán đổi nguyên tử',
     'Replace a table without anyone reading a half-finished state.',
     'Đổi bảng mà không để ai đọc thấy trạng thái nửa vời.'),

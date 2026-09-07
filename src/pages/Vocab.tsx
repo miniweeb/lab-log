@@ -10,6 +10,7 @@ export default function Vocab() {
   const [code, setCode] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [sortMode, setSortMode] = useState<SortMode>('assignment')
+  const [onlyUnmastered, setOnlyUnmastered] = useState(false)
   
   // Pagination state (List mode)
   const [page, setPage] = useState(1)
@@ -31,7 +32,15 @@ export default function Vocab() {
     localStorage.setItem('lab-log:vocab:mastered', JSON.stringify(next))
   }
 
-  const filtered = useMemo(() => filterTerms(allTerms, query, code), [query, code])
+  const base = useMemo(() => filterTerms(allTerms, query, code), [query, code])
+  const filtered = useMemo(
+    () => (onlyUnmastered ? base.filter((t) => !mastered[`${t.assignmentId}-${t.term}`]) : base),
+    [base, onlyUnmastered, mastered],
+  )
+  const masteredCount = useMemo(
+    () => base.filter((t) => mastered[`${t.assignmentId}-${t.term}`]).length,
+    [base, mastered],
+  )
   
   // Total pages
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -48,7 +57,8 @@ export default function Vocab() {
     [pageItems, sortMode],
   )
 
-  const curCard = filtered[cardIndex] || filtered[0]
+  const safeIndex = Math.min(cardIndex, Math.max(0, filtered.length - 1))
+  const curCard = filtered[safeIndex]
   const curCardKey = curCard ? `${curCard.assignmentId}-${curCard.term}` : ''
 
   const handlePageChange = (newPage: number) => {
@@ -64,7 +74,9 @@ export default function Vocab() {
 
       <div className="card intro" style={{ marginBottom: 16 }}>
         <p>
-          Toàn bộ thuật ngữ từ các bài lab (A00 – A05). Hỗ trợ chế độ <b>Danh sách tra cứu</b> và <b>Thẻ ghi nhớ (Flashcard)</b> để học thuộc lòng từ vựng chuyên ngành.
+          Toàn bộ thuật ngữ từ các bài lab (A00 – A07). Hỗ trợ chế độ <b>Danh sách tra cứu</b> và{' '}
+          <b>Thẻ ghi nhớ (Flashcard)</b> để học thuộc từ vựng chuyên ngành. Thuật ngữ giữ nguyên
+          tiếng Anh vì đó là dạng bạn sẽ gặp trong tài liệu và khi trao đổi với đồng nghiệp.
         </p>
       </div>
 
@@ -131,16 +143,45 @@ export default function Vocab() {
         ))}
       </div>
 
+      <div className="vocab-progress" style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0 4px', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 180px', height: 6, borderRadius: 99, background: 'var(--line)', overflow: 'hidden' }}>
+          <div
+            style={{
+              width: `${base.length ? (masteredCount / base.length) * 100 : 0}%`,
+              height: '100%',
+              background: '#10b981',
+              transition: 'width .25s ease',
+            }}
+          />
+        </div>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 12.5, color: 'var(--muted)' }}>
+          Đã thuộc {masteredCount}/{base.length}
+        </span>
+        <button
+          className={`btn sm ${onlyUnmastered ? '' : 'ghost'}`}
+          style={{ fontSize: 12, padding: '3px 10px', height: 'auto' }}
+          onClick={() => {
+            setOnlyUnmastered(!onlyUnmastered)
+            setPage(1)
+            setCardIndex(0)
+          }}
+        >
+          {onlyUnmastered ? '✓ Chỉ từ chưa thuộc' : '○ Chỉ từ chưa thuộc'}
+        </button>
+      </div>
+
       {filtered.length === 0 ? (
-        <Empty ico="🔍">
-          Không có thuật ngữ nào khớp. Thử từ khoá ngắn hơn, hoặc bỏ bộ lọc bài.
+        <Empty ico={onlyUnmastered ? '🎉' : '🔍'}>
+          {onlyUnmastered
+            ? 'Không còn từ nào chưa thuộc trong bộ lọc này. Bỏ bộ lọc để ôn lại.'
+            : 'Không có thuật ngữ nào khớp. Thử từ khoá ngắn hơn, hoặc bỏ bộ lọc bài.'}
         </Empty>
       ) : viewMode === 'flashcard' && curCard ? (
         /* ════════════ VOCAB FLASHCARD MODE ════════════ */
         <div className="flashcard-box" style={{ maxWidth: 680, margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--muted)' }}>
-              Thẻ {cardIndex + 1} / {filtered.length} · <span className="code-tag">{curCard.code}</span>
+              Thẻ {safeIndex + 1} / {filtered.length} · <span className="code-tag">{curCard.code}</span>
             </span>
             <button
               className={`btn sm ${mastered[curCardKey] ? 'ghost' : ''}`}
@@ -206,9 +247,9 @@ export default function Vocab() {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
             <button
               className="btn ghost sm"
-              disabled={cardIndex === 0}
+              disabled={safeIndex === 0}
               onClick={() => {
-                setCardIndex(cardIndex - 1)
+                setCardIndex(safeIndex - 1)
                 setIsFlipped(false)
               }}
             >
@@ -222,9 +263,9 @@ export default function Vocab() {
             </button>
             <button
               className="btn ghost sm"
-              disabled={cardIndex >= filtered.length - 1}
+              disabled={safeIndex >= filtered.length - 1}
               onClick={() => {
-                setCardIndex(cardIndex + 1)
+                setCardIndex(safeIndex + 1)
                 setIsFlipped(false)
               }}
             >

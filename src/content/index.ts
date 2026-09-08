@@ -9,6 +9,7 @@ import { a05 } from './a05'
 import { a06 } from './a06'
 import { a07 } from './a07'
 import { a08 } from './a08'
+import { a09 } from './a09'
 
 /**
  * MỞ MỘT BÀI MỚI:
@@ -36,9 +37,7 @@ export const assignments: AssignmentSpec[] = [
   a06,
   a07,
   a08,
-  locked('A09', 'Atomic swap', 'Hoán đổi nguyên tử',
-    'Replace a table without anyone reading a half-finished state.',
-    'Đổi bảng mà không để ai đọc thấy trạng thái nửa vời.'),
+  a09,
   locked('A10', 'Schema evolution', 'Lược đồ thay đổi theo thời gian',
     'Month two arrives and the shape has changed.',
     'Tháng hai về, và cấu trúc dữ liệu đã khác.'),

@@ -10,6 +10,7 @@ import { a06 } from './a06'
 import { a07 } from './a07'
 import { a08 } from './a08'
 import { a09 } from './a09'
+import { a10 } from './a10'
 
 /**
  * MỞ MỘT BÀI MỚI:
@@ -38,9 +39,7 @@ export const assignments: AssignmentSpec[] = [
   a07,
   a08,
   a09,
-  locked('A10', 'Schema evolution', 'Lược đồ thay đổi theo thời gian',
-    'Month two arrives and the shape has changed.',
-    'Tháng hai về, và cấu trúc dữ liệu đã khác.'),
+  a10,
   locked('A11', 'Backfill', 'Nạp bù quá khứ',
     'Re-run old days after discovering corrupted data.',
     'Chạy lại các ngày cũ khi phát hiện dữ liệu hỏng.'),

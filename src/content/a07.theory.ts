@@ -6,32 +6,36 @@ export const a07Theory: TheorySection[] = [
   {
     level: 'problem',
     heading: bi(
-      'Failure is not the problem — what it leaves behind is',
-      'Việc job hỏng không phải vấn đề — vấn đề là nó để lại trạng thái gì',
+      'Failure is not the problem. What it leaves behind is.',
+      'Chuyện hỏng không đáng sợ. Đáng sợ là thứ nó để lại',
     ),
     paras: [
       bi(
-        'Real pipelines fail all the time: the network drops, a disk fills up, a laptop sleeps mid-run, someone hits Ctrl+C. Failure itself is not the problem — the problem is what state it leaves behind, and what happens when you (or a scheduler) run the job again.',
-        'Pipeline thật hỏng liên tục: mạng rớt, ổ đĩa đầy, laptop sleep giữa chừng, ai đó bấm Ctrl+C. Bản thân việc hỏng không phải vấn đề — vấn đề là nó để lại trạng thái gì, và chuyện gì xảy ra khi bạn (hoặc scheduler) chạy lại job đó.',
+        'Real pipelines fail constantly. The network drops, a disk fills up, a laptop sleeps mid-run, someone hits Ctrl+C. None of that is avoidable.',
+        'Pipeline thật hỏng suốt. Mạng rớt, đĩa đầy, laptop ngủ giữa chừng, hoặc ai đó bấm Ctrl+C. Không tránh được cái nào cả.',
       ),
       bi(
-        'A crashed or re-run load job can end three ugly ways. DOUBLE DATA: the job succeeded, someone ran it again, every row is in twice. HALF DATA: the job crashed mid-insert; the table holds part of a day. MISSING DATA: the job deleted the old day, crashed before inserting the new one.',
-        'Một job load bị crash hoặc chạy lại có thể kết thúc theo ba cách tệ. DỮ LIỆU GẤP ĐÔI: job chạy xong, ai đó chạy lại, mọi dòng vào hai lần. DỮ LIỆU MỘT NỬA: job crash giữa lúc insert; bảng chứa một phần của ngày. MẤT DỮ LIỆU: job đã xoá ngày cũ rồi crash trước khi insert ngày mới.',
+        'The question is what state the crash leaves the table in, and what happens when you — or a scheduler, at 3 a.m., without asking — run the job again.',
+        'Vấn đề là lần chết đó để cái bảng của bạn ở trạng thái nào, và chuyện gì xảy ra khi bạn, hoặc một cái scheduler lúc 3 giờ sáng chẳng hỏi ai, chạy lại đúng job đó.',
       ),
       bi(
-        'The worst pipeline failures are silent. A double INSERT does not error, does not warn — 62,707 rows quietly become 125,414 and every downstream number doubles. Nobody finds out until someone questions a revenue figure.',
-        'Những lần hỏng tệ nhất của pipeline đều diễn ra trong im lặng. Một lệnh INSERT chạy hai lần không báo lỗi, không cảnh báo — 62.707 dòng lặng lẽ thành 125.414 và mọi con số phía dưới nhân đôi. Không ai phát hiện cho tới khi có người thắc mắc về một con số doanh thu.',
+        'A crashed or re-run load ends three ugly ways. Double data: the job succeeded, someone ran it again, every row is in twice. Half data: the job died mid-insert and the table holds part of a day. Missing data: the job deleted the old day, then died before inserting the new one.',
+        'Một lần nạp bị chết hoặc bị chạy lại kết thúc theo ba kiểu xấu. Một là dữ liệu nhân đôi: job chạy xong rồi, có người chạy lại, mọi dòng vào bảng hai lần. Hai là dữ liệu một nửa: job chết giữa lúc insert, bảng chỉ giữ được một phần của ngày. Ba là mất dữ liệu: job xoá ngày cũ xong thì chết, chưa kịp insert ngày mới.',
+      ),
+      bi(
+        'Task 1 makes you watch the first one happen: 62,707 rows become 125,414 after an accidental second run. Nothing errors. No warning. The worst pipeline failures are the quiet ones.',
+        'Task 1 bắt bạn nhìn tận mắt kiểu thứ nhất: 62.707 dòng thành 125.414 sau một lần chạy lại nhỡ tay. Không lỗi nào báo. Không cảnh báo nào. Mấy kiểu hỏng tệ nhất của pipeline đều là kiểu im lặng.',
       ),
     ],
     checks: [
       {
         q: bi(
-          'Why is "just be careful not to run it twice" not a solution?',
-          'Vì sao "cẩn thận đừng chạy hai lần" không phải là giải pháp?',
+          'Why can a plain INSERT never be safe to re-run?',
+          'Vì sao một câu INSERT trần không bao giờ an toàn khi chạy lại?',
         ),
         a: bi(
-          'Because you are not the only one running it. A scheduler retries on timeout, a colleague reruns after a fix, a backfill sweeps the same date range. Every serious orchestrator (Airflow, Dagster, dbt) ASSUMES your tasks are safe to re-run — that assumption is the interface.',
-          'Vì không chỉ mình bạn chạy nó. Scheduler tự retry khi timeout, đồng nghiệp chạy lại sau khi sửa lỗi, một lần backfill quét lại đúng khoảng ngày đó. Mọi orchestrator nghiêm túc (Airflow, Dagster, dbt) đều GIẢ ĐỊNH task của bạn chạy lại được an toàn — giả định đó chính là giao diện làm việc.',
+          'Because it only knows how to add. It has no idea whether the rows it is about to write are already sitting in the table — and the table has no way to tell it. Safety has to come from somewhere else: either the operation removes what it is about to write first, or the table refuses duplicates on its own.',
+          'Vì nó chỉ biết thêm vào. Nó không hề biết mấy dòng nó sắp ghi đã nằm sẵn trong bảng hay chưa, mà bảng thì cũng chẳng có cách nào nói cho nó biết. Tính an toàn phải đến từ chỗ khác: hoặc bản thân thao tác tự xoá đúng phần nó sắp ghi trước đã, hoặc cái bảng tự nó từ chối dòng trùng.',
         ),
       },
     ],
@@ -40,63 +44,71 @@ export const a07Theory: TheorySection[] = [
   /* ─────────── TẦNG 2 ─────────── */
   {
     level: 'alternatives',
-    heading: bi('Four ways to handle a re-run', 'Bốn cách xử lý việc chạy lại'),
-    paras: [],
+    heading: bi(
+      'Four ways to make a re-run safe',
+      'Bốn cách làm cho việc chạy lại trở nên an toàn',
+    ),
+    paras: [
+      bi(
+        'All four are used in production somewhere. The difference is how much they ask of the storage, and how much they ask of you to remember.',
+        'Cả bốn cách đều đang chạy thật ở đâu đó. Khác nhau ở chỗ chúng đòi hỏi gì ở kho lưu trữ, và bắt bạn phải nhớ bao nhiêu thứ.',
+      ),
+    ],
     alternatives: [
       {
-        name: bi('Just INSERT — and be careful', 'Cứ INSERT — và cẩn thận'),
+        name: bi('Just be careful not to run it twice', 'Cứ cẩn thận đừng chạy hai lần'),
         appeal: bi(
-          'Simplest possible code, one statement, no state to manage.',
-          'Code đơn giản nhất có thể, một câu lệnh, không phải quản lý trạng thái gì.',
+          'No code at all. And honestly, for a job one person runs by hand once a week, it holds up longer than it deserves to.',
+          'Không phải viết dòng nào. Mà nói thật, với một job mà mỗi tuần một người chạy tay một lần thì nó trụ được lâu hơn mức đáng ra nó nên trụ.',
         ),
         breaks: bi(
-          'It fails silently in the worst way: rows double, nothing errors, no warning. And "careful" does not survive contact with a scheduler that retries on timeout — the retry itself is the second run.',
-          'Nó hỏng trong im lặng theo cách tệ nhất: số dòng nhân đôi, không lỗi, không cảnh báo. Và "cẩn thận" không sống sót khi gặp một scheduler tự retry lúc timeout — chính lần retry đó là lần chạy thứ hai.',
+          'It stops holding the moment a scheduler is involved, or a retry, or a second person, or you at the end of a long day. And the failure is silent — you find out from a number that looks slightly too good.',
+          'Nó thôi trụ ngay khi có một cái scheduler tham gia, hoặc một lần retry, hoặc một người thứ hai, hoặc chính bạn vào cuối một ngày dài. Mà lúc hỏng thì nó im lặng — bạn phát hiện ra qua một con số trông hơi đẹp quá mức bình thường.',
         ),
       },
       {
-        name: bi('TRUNCATE the whole table, then reload everything', 'TRUNCATE cả bảng rồi nạp lại toàn bộ'),
+        name: bi('Put a unique key on the table and let it reject duplicates', 'Đặt khoá unique lên bảng, để nó tự chặn dòng trùng'),
         appeal: bi(
-          'Guaranteed no duplicates: the table always ends up holding exactly what the source says.',
-          'Chắc chắn không trùng: bảng luôn kết thúc ở đúng trạng thái mà nguồn quy định.',
+          'The database enforces it, so no discipline is required. Insert the same day twice and the second one bounces off a constraint.',
+          'Database tự lo, nên không cần ai phải kỷ luật gì. Insert cùng một ngày hai lần thì lần thứ hai bị ràng buộc chặn lại.',
         ),
         breaks: bi(
-          'Reloading one day means reprocessing the entire history — 45 files today, thousands later. And a crash mid-reload leaves you with nothing at all, not even the old data. Re-runnability should cost the size of one unit of work, not the size of the warehouse.',
-          'Nạp lại một ngày nghĩa là xử lý lại toàn bộ lịch sử — hôm nay là 45 file, sau này là hàng nghìn. Và nếu crash giữa lúc nạp lại thì bạn không còn gì cả, kể cả dữ liệu cũ. Khả năng chạy lại phải tốn bằng kích thước MỘT đơn vị công việc, không phải bằng kích thước cả warehouse.',
+          'This feed has no unique key to give you. The same order_id legitimately appears in several files, because about 1.5% of every file is late corrections, and some ids are already duplicated inside a single file. A constraint here would reject correct data and let the real problem through.',
+          'Nhưng feed này không có khoá unique nào để mà đặt. Cùng một order_id xuất hiện ở nhiều file là chuyện hợp lệ, vì khoảng 1,5% mỗi file là bản sửa về trễ, và có những id vốn đã trùng ngay bên trong một file. Đặt ràng buộc ở đây sẽ chặn nhầm dữ liệu đúng, còn vấn đề thật thì vẫn lọt.',
         ),
       },
       {
-        name: bi('Check first: "does this day already exist?"', 'Kiểm tra trước: "ngày này đã có chưa?"'),
+        name: bi('Check before inserting: has this day loaded yet?', 'Kiểm trước khi insert: ngày này nạp chưa?'),
         appeal: bi(
-          'Cheap, obvious, and it stops the double INSERT.',
-          'Rẻ, dễ hiểu, và nó chặn được việc INSERT hai lần.',
+          'Cheap, obvious, and it reads exactly like what you want: if the day is already there, skip it.',
+          'Rẻ, dễ hiểu, và đọc lên đúng như thứ bạn muốn: ngày đó có rồi thì bỏ qua.',
         ),
         breaks: bi(
-          'It stops the double, but it cannot fix a HALF day. If the previous run crashed after inserting 30,000 of 62,707 rows, the check says "exists" and skips — leaving the table permanently wrong. A guard is not a substitute for a transaction.',
-          'Nó chặn được việc nhân đôi, nhưng không sửa được một ngày NẠP DỞ. Nếu lần chạy trước crash sau khi insert 30.000 trên 62.707 dòng, phép kiểm tra sẽ nói "đã có" rồi bỏ qua — để lại bảng sai vĩnh viễn. Một cái chốt kiểm tra không thay thế được transaction.',
+          'It cannot tell "loaded" from "half loaded". A job that died mid-insert leaves rows for that date, so the check says yes and the day stays broken forever. And now you have two code paths — first load and re-load — which drift apart, because only one of them gets exercised daily.',
+          'Nhưng nó không phân biệt được "đã nạp" với "nạp được một nửa". Một job chết giữa lúc insert vẫn để lại dòng của ngày đó, nên phép kiểm trả lời là có, và ngày đó hỏng vĩnh viễn. Với lại giờ bạn có hai nhánh code — nạp lần đầu và nạp lại — rồi hai nhánh sẽ trôi khỏi nhau, vì chỉ một nhánh được chạy mỗi ngày.',
         ),
       },
       {
-        name: bi('Use MERGE / UPSERT on the primary key', 'Dùng MERGE / UPSERT theo primary key'),
+        name: bi('Delete what you are about to write, then write it', 'Xoá đúng phần sắp ghi, rồi ghi'),
         appeal: bi(
-          'The database handles it: matched rows update, unmatched insert. One statement, no delete.',
-          'Để database lo: dòng khớp thì update, không khớp thì insert. Một câu lệnh, không cần xoá.',
+          'One code path for everything. DELETE WHERE _data_date = D runs on the very first load too — it deletes zero rows and costs nothing. First run and re-run are literally the same lines of code, so there is no second path to rot.',
+          'Một nhánh code cho mọi trường hợp. Câu DELETE WHERE _data_date = D chạy cả ở lần nạp đầu tiên — nó xoá 0 dòng và chẳng tốn gì. Lần đầu và lần chạy lại dùng đúng những dòng code y hệt nhau, nên không có nhánh thứ hai nào để mà mục ruỗng.',
         ),
         breaks: bi(
-          'It works — for feeds where a key means one row. Here it does not: the same order_id legitimately appears in several files as a late correction, so "the key" is not unique in the target. And MERGE cannot remove rows a corrected file no longer contains. Delete-what-I-would-write is simpler and covers both.',
-          'Nó chạy được — với những feed mà một key ứng với một dòng. Ở đây thì không: cùng một order_id xuất hiện hợp lệ trong nhiều file dưới dạng late correction, nên "key" không duy nhất trong bảng đích. Và MERGE không xoá được những dòng mà file đã sửa không còn chứa nữa. Cách "xoá đúng phần mình sắp ghi" đơn giản hơn và phủ được cả hai.',
+          'On its own it still leaves a hole: die between the DELETE and the INSERT and the day is gone. That is what the transaction is for, and why the two always travel together.',
+          'Nhưng chỉ mình nó thì vẫn hở một lỗ: chết giữa DELETE và INSERT là mất trắng cả ngày đó. Cái transaction sinh ra để bịt chỗ đó, và cũng vì thế mà hai thứ này luôn đi cùng nhau.',
         ),
       },
     ],
     checks: [
       {
         q: bi(
-          'Why delete by _data_date and not by order_date?',
-          'Vì sao xoá theo _data_date chứ không theo order_date?',
+          'What exactly makes the delete+insert pattern idempotent?',
+          'Chính xác thì điều gì làm cho khuôn delete rồi insert trở nên idempotent?',
         ),
         a: bi(
-          'Because ~1.5% of a file\'s rows are late corrections belonging to EARLIER order dates (A02). Delete by order_date and every re-run duplicates those late rows. The idempotency key is "what did this file write" (_data_date), not "what dates does it mention" (order_date).',
-          'Vì khoảng 1,5% số dòng trong một file là late correction thuộc về những order date CŨ HƠN (A02). Xoá theo order_date thì mỗi lần chạy lại sẽ nhân đôi những dòng trễ đó. Khoá idempotency là "file này đã ghi những gì" (_data_date), không phải "file này nhắc tới những ngày nào" (order_date).',
+          'That the DELETE covers exactly what the INSERT is about to write, no more and no less. Here the unit is one source file — one day\'s CSV — and every row already carries that day in _data_date. Pick the unit of work and make it replaceable; the rest follows.',
+          'Ở chỗ câu DELETE phủ đúng phần mà câu INSERT sắp ghi, không thừa không thiếu. Ở đây đơn vị công việc là một file nguồn, tức CSV của một ngày, và mọi dòng đều đã mang sẵn ngày đó ở cột _data_date. Chọn đơn vị công việc rồi làm cho nó thay thế được, phần còn lại tự theo sau.',
         ),
       },
     ],
@@ -106,32 +118,36 @@ export const a07Theory: TheorySection[] = [
   {
     level: 'idea',
     heading: bi(
-      'Pick a unit of work, make it replaceable',
-      'Chọn một đơn vị công việc, làm cho nó thay thế được',
+      'Make the operation replaceable, and give the pipeline a memory',
+      'Làm cho thao tác thay thế được, và cho pipeline một trí nhớ',
     ),
     paras: [
       bi(
-        'Idempotent, in one line: an operation is idempotent if running it once or running it ten times leaves the system in the same final state. An elevator call button is idempotent — press it five times, one elevator comes. A "top up my account by $10" button is not.',
-        'Idempotent, định nghĩa một dòng: một thao tác là idempotent nếu chạy nó một lần hay mười lần đều để lại hệ thống ở cùng một trạng thái cuối. Nút gọi thang máy là idempotent — bấm năm lần vẫn một thang máy tới. Nút "nạp thêm 10 đô vào tài khoản" thì không.',
+        'Idempotent, in one line: running an operation once or ten times leaves the system in the same final state. An elevator call button is idempotent — press it five times, one elevator comes. A "top up my account by $10" button is not.',
+        'Idempotent, nói gọn một câu: chạy một lần hay chạy mười lần thì hệ thống cũng dừng lại ở cùng một trạng thái. Cái nút gọi thang máy là idempotent — bấm năm lần thì vẫn một cái thang tới. Cái nút "nạp thêm 10 đô vào tài khoản" thì không.',
       ),
       bi(
-        'One design decision matters more than any code: pick the unit of work, and make it replaceable. Our unit is ONE SOURCE FILE — one day\'s CSV. Every row already carries the file\'s business date (the _data_date lineage column from A03), and publishing deletes exactly WHERE _data_date = D before inserting. Delete-what-I-would-write, then write: re-run = replace.',
-        'Có một quyết định thiết kế quan trọng hơn mọi dòng code: chọn đơn vị công việc, và làm cho nó thay thế được. Đơn vị của chúng ta là MỘT FILE NGUỒN — file CSV của một ngày. Mọi dòng đã mang sẵn business date của file (cột lineage _data_date từ A03), và khi publish thì xoá đúng WHERE _data_date = D trước khi insert. Xoá đúng phần mình sắp ghi, rồi mới ghi: chạy lại = thay thế.',
+        'Transactions remove two of the three failure modes. A transaction groups statements into one all-or-nothing unit: after BEGIN nothing is visible until COMMIT, and if the process dies first it is as if nothing ran. So publishing becomes BEGIN, DELETE the old copy, INSERT the new copy, COMMIT. Readers see the old day or the new day, never a mix.',
+        'Transaction xử lý hai trong ba kiểu hỏng. Nó gom các câu lệnh thành một khối trọn-hoặc-không: sau BEGIN thì chưa ai thấy gì cho tới lúc COMMIT, còn nếu tiến trình chết trước đó thì coi như chưa có gì chạy. Nên việc công bố dữ liệu thành ra là BEGIN, xoá bản cũ, insert bản mới, COMMIT. Người đọc thấy ngày cũ hoặc ngày mới, không bao giờ thấy một mớ lẫn lộn.',
       ),
       bi(
-        'Note what this does NOT promise: the same order_id still appears in several files (the ~1.5% late corrections from A02). Making the CONTENT converge — latest update wins — is A08\'s job. Today we only make the OPERATION safe.',
-        'Chú ý điều này KHÔNG hứa: cùng một order_id vẫn xuất hiện trong nhiều file (khoảng 1,5% late correction từ A02). Làm cho NỘI DUNG hội tụ — bản cập nhật mới nhất thắng — là việc của A08. Hôm nay ta chỉ làm cho THAO TÁC trở nên an toàn.',
+        'A run ledger removes the third. A pipeline needs memory of what it has done, and ops.etl_runs is that memory: a plain table, one row per attempt, carrying the date, the step, running/success/failed, the row count and the error. It answers "did yesterday load?" with a query instead of a guess.',
+        'Còn kiểu hỏng thứ ba thì cần một cuốn sổ ghi các lần chạy. Pipeline phải nhớ được nó đã làm những gì, và bảng ops.etl_runs chính là trí nhớ đó: một cái bảng thường, mỗi lần thử một dòng, ghi ngày, bước, trạng thái running hay success hay failed, số dòng và lỗi. Nó trả lời câu "hôm qua nạp được chưa" bằng một câu query chứ không bằng phỏng đoán.',
+      ),
+      bi(
+        'Every attempt gets its own row. Failures are history worth keeping, not shame to overwrite — and A11 is built entirely on being able to read that history back.',
+        'Mỗi lần thử một dòng riêng. Những lần hỏng là lịch sử đáng giữ, không phải chuyện xấu hổ cần ghi đè lên — mà A11 thì dựng hoàn toàn trên khả năng đọc lại được cái lịch sử đó.',
       ),
     ],
     checks: [
       {
         q: bi(
-          'Why does DELETE run even on the very first load, when there is nothing to delete?',
-          'Vì sao lệnh DELETE vẫn chạy ngay cả ở lần load đầu tiên, khi chẳng có gì để xoá?',
+          'Why does the success UPDATE on the ledger sit inside BEGIN…COMMIT?',
+          'Vì sao câu UPDATE báo thành công lên ledger lại nằm bên trong BEGIN và COMMIT?',
         ),
         a: bi(
-          'It deletes 0 rows and costs nothing — and in exchange, the first run and the re-run are the SAME CODE PATH. Fewer paths, fewer bugs. A branch that only executes on re-runs is a branch nobody tests.',
-          'Nó xoá 0 dòng và không tốn gì — đổi lại, lần chạy đầu và lần chạy lại đi CÙNG MỘT NHÁNH CODE. Ít nhánh thì ít lỗi. Một nhánh chỉ chạy khi rerun là một nhánh không ai kiểm thử.',
+          'So the ledger can never claim success for data that is not there. If the update sat outside, a crash in the gap would leave a row saying success next to a table with nothing in it — and the next run would trust the ledger and skip the day.',
+          'Để ledger không bao giờ báo thành công cho một mớ dữ liệu không tồn tại. Nếu câu update nằm ngoài, một lần chết đúng vào khoảng giữa sẽ để lại một dòng ghi success bên cạnh một cái bảng rỗng — rồi lần chạy sau tin vào ledger và bỏ qua ngày đó luôn.',
         ),
       },
     ],
@@ -141,50 +157,50 @@ export const a07Theory: TheorySection[] = [
   {
     level: 'mechanism',
     heading: bi(
-      'Transactions, the run ledger, and what each one removes',
-      'Transaction, run ledger, và mỗi thứ loại bỏ được kiểu hỏng nào',
+      'Where the run\'s facts live, and which failures deserve a retry',
+      'Những sự thật về lần chạy nằm ở đâu, và kiểu hỏng nào đáng thử lại',
     ),
     paras: [
       bi(
-        'A TRANSACTION removes two of the three failure modes. It groups statements into one all-or-nothing unit: after BEGIN, nothing is visible until COMMIT; if the process dies first, it is as if nothing ran. DuckDB guarantees this — it is an ACID database, and the A (atomicity) is exactly this promise — even when the process is killed outright.',
-        'TRANSACTION loại bỏ hai trong ba kiểu hỏng. Nó gom các câu lệnh thành một khối được ăn cả ngã về không: sau BEGIN, không gì hiển thị ra ngoài cho tới COMMIT; nếu process chết trước đó thì coi như chưa có gì chạy. DuckDB đảm bảo điều này — nó là database ACID, và chữ A (atomicity) chính là lời hứa này — kể cả khi process bị giết thẳng.',
+        'The ledger finishes a story A03 started. The _run_id lineage column has sat NULL in every row since then; today it comes alive. Every published row names the run that wrote it, every run writes its own log file, and a load that gives up for good writes an ops.alerts row. Row points at run, run points at log.',
+        'Cuốn sổ này khép lại một câu chuyện mở ra từ A03. Cột lineage _run_id nằm NULL trong mọi dòng từ hồi đó tới giờ; hôm nay nó sống dậy. Mỗi dòng được công bố đều gọi tên lần chạy đã ghi ra nó, mỗi lần chạy tự ghi một file log riêng, và một lần nạp bỏ cuộc hẳn thì ghi thêm một dòng vào ops.alerts. Dòng trỏ tới lần chạy, lần chạy trỏ tới log.',
       ),
       bi(
-        'So publishing becomes: BEGIN; DELETE the old copy; INSERT the new copy; COMMIT. Readers see the old day or the new day, never a mix. And the ledger UPDATE that records success sits INSIDE that transaction, so the ledger can never claim success for data that is not there.',
-        'Nhờ vậy việc publish trở thành: BEGIN; DELETE bản cũ; INSERT bản mới; COMMIT. Người đọc thấy hoặc ngày cũ hoặc ngày mới, không bao giờ thấy hỗn hợp. Và lệnh UPDATE ghi nhận thành công vào ledger nằm BÊN TRONG transaction đó, nên ledger không bao giờ có thể khai là thành công cho dữ liệu không tồn tại.',
+        'It also collects on A03\'s other lesson, the restraint. A03 gave every row exactly two warehouse-added columns and said the file name and load timestamp did not belong there. Today you build the place they do belong: ops.etl_runs carries source_file and finished_at, one row per attempt, and _run_id is the pointer.',
+        'Nó cũng thu về bài học còn lại của A03, tức chuyện biết kiềm chế. A03 cho mỗi dòng đúng hai cột do warehouse thêm vào, và nói rằng tên file với thời điểm nạp không thuộc về chỗ đó. Hôm nay bạn dựng đúng cái chỗ chúng thuộc về: bảng ops.etl_runs mang cột source_file và finished_at, mỗi lần thử một dòng, còn _run_id là con trỏ nối hai bên.',
       ),
       bi(
-        'A RUN LEDGER removes the third. A pipeline needs memory of what it has done. ops.etl_runs is a plain table with one row per ATTEMPT: date, step, running/success/failed, row count, error. It answers "did yesterday load?" with a query instead of a guess — and lets you skip work already done. Every attempt gets its own row; failures are history worth keeping, not shame to overwrite.',
-        'RUN LEDGER loại bỏ kiểu hỏng thứ ba. Một pipeline cần có trí nhớ về những gì nó đã làm. Bảng ops.etl_runs là một bảng bình thường, mỗi LẦN THỬ một dòng: ngày, bước, trạng thái running/success/failed, số dòng, lỗi. Nó trả lời câu "hôm qua có load không?" bằng một truy vấn thay vì bằng phỏng đoán — và cho phép bỏ qua việc đã làm rồi. Mỗi lần thử một dòng riêng; những lần thất bại là lịch sử đáng giữ, không phải điều đáng che giấu.',
+        'The arithmetic makes the case. Store the file name once on the run and 62,707 rows point at it with an 8-byte id. Copy it onto every row instead and you have 62,707 identical copies of a string — and if the day is re-loaded from a corrected file, all 62,707 have to be rewritten. One ledger row changes instead.',
+        'Làm phép tính là thấy ngay. Lưu tên file một lần trên lần chạy, thế là 62.707 dòng trỏ tới nó qua một cái id 8 byte. Còn chép nó xuống từng dòng thì bạn có 62.707 bản sao y hệt của một chuỗi — mà nếu ngày đó phải nạp lại từ một file đã sửa thì cả 62.707 bản đều phải viết lại. Cách kia thì chỉ một dòng trong ledger đổi.',
       ),
       bi(
-        'The ledger also finishes a story A03 started. The _run_id lineage column has sat NULL in every row since then. Today it comes alive: every published row names the run that wrote it, every run writes its own log file, and a load that gives up for good writes an ops.alerts row. Row → run → log: when a number looks wrong three weeks from now, you can reconstruct exactly where it came from.',
-        'Ledger cũng kết thúc một câu chuyện mà A03 đã mở ra. Cột lineage _run_id đã nằm NULL ở mọi dòng từ hồi đó tới giờ. Hôm nay nó sống dậy: mọi dòng được publish đều ghi tên lần chạy đã ghi nó, mọi lần chạy đều viết file log riêng, và một lần load bỏ cuộc hẳn sẽ ghi một dòng vào ops.alerts. Dòng dữ liệu → lần chạy → file log: khi một con số trông sai sau ba tuần, bạn dựng lại được chính xác nó từ đâu ra.',
+        'The INSERT that opens the ledger row records source_file right away, before anything can go wrong. A failed attempt should still be able to tell you which file it choked on.',
+        'Câu INSERT mở dòng ledger ghi luôn cột source_file ngay từ đầu, trước khi có gì kịp hỏng. Một lần thử thất bại vẫn phải nói được nó nghẹn ở file nào.',
       ),
       bi(
-        'RETRIES handle the rest. Transient failures (network blip, briefly locked file) are worth retrying — with doubling waits, 1s, 2s, 4s, 8s ("exponential backoff"), to give a struggling system air instead of hammering it. Deterministic failures (corrupt file, failed validation) just fail again, slower. Catch TransientError only; let ValueError fly.',
-        'RETRY lo phần còn lại. Những lỗi tạm thời (mạng chớp tắt, file bị khoá trong chốc lát) thì đáng thử lại — với thời gian chờ nhân đôi dần: 1 giây, 2 giây, 4 giây, 8 giây ("exponential backoff"), để hệ thống đang vật vã có chỗ thở thay vì bị dồn ép. Còn lỗi tất định (file hỏng, validation không đạt) thì thử lại vẫn hỏng, chỉ chậm hơn. Chỉ bắt TransientError; để ValueError bay thẳng ra.',
+        'Now retries. A transient failure — a network blip, a briefly locked file — is worth retrying, with doubling waits of 1, 2, 4, 8 seconds, to give a struggling system air instead of hammering it. A deterministic failure — a corrupt file, a failed validation — will just fail again, slower. Retry only the transient kind, and that means your code has to be able to tell them apart.',
+        'Giờ tới chuyện thử lại. Một lần hỏng nhất thời — mạng chớp một cái, file bị khoá trong chốc lát — thì đáng thử lại, với thời gian chờ nhân đôi dần 1, 2, 4, 8 giây, để hệ thống đang đuối có chỗ thở chứ không bị nện liên tục. Còn một lần hỏng tất định — file hỏng, validate không qua — thì thử lại cũng hỏng y như vậy, chỉ chậm hơn. Chỉ thử lại loại nhất thời, và điều đó có nghĩa code của bạn phải phân biệt được hai loại.',
       ),
     ],
     checks: [
       {
         q: bi(
-          'The job crashes between DELETE and INSERT. Why is the day still intact?',
-          'Job crash giữa lệnh DELETE và INSERT. Vì sao ngày đó vẫn còn nguyên?',
+          'The chaos monkey kills the loader between the DELETE and the INSERT. What does the table look like afterwards?',
+          'Con khỉ phá hoại giết loader đúng giữa câu DELETE và câu INSERT. Sau đó cái bảng trông thế nào?',
         ),
         a: bi(
-          'Because both statements are inside one transaction. The crash triggers a rollback, which undoes the DELETE — the old day is still there, untouched. Without a transaction this exact crash LOSES A DAY OF DATA, which is why mid_transaction is the chaos point worth seeing fire.',
-          'Vì cả hai câu lệnh nằm trong cùng một transaction. Lần crash đó kích hoạt rollback, và rollback hoàn tác lệnh DELETE — ngày cũ vẫn còn đó, nguyên vẹn. Không có transaction thì đúng lần crash này sẽ LÀM MẤT MỘT NGÀY DỮ LIỆU, và đó là lý do mid_transaction là điểm chaos đáng nhìn thấy nhất.',
+          'Exactly as it did before the run started. The DELETE was never committed, so it never happened as far as any reader is concerned. That is the whole promise of the A in ACID, and Task 6 has you verify it by checksum rather than take it on faith.',
+          'Y hệt như trước khi lần chạy đó bắt đầu. Câu DELETE chưa được commit, nên với mọi người đọc thì nó chưa từng xảy ra. Đó đúng là lời hứa của chữ A trong ACID, và Task 6 bắt bạn kiểm lại bằng checksum chứ không phải tin suông.',
         ),
       },
       {
         q: bi(
-          'Why must the ledger UPDATE sit inside BEGIN…COMMIT?',
-          'Vì sao lệnh UPDATE ledger phải nằm bên trong BEGIN…COMMIT?',
+          'Why check the environment before touching data, when the load would fail anyway?',
+          'Vì sao phải kiểm môi trường trước khi động vào dữ liệu, trong khi đằng nào lần nạp đó cũng hỏng?',
         ),
         a: bi(
-          'Otherwise a crash between the data commit and the ledger update makes the ledger LIE — it says failed for data that is actually there, or success for data that is not. And ledger lies become skipped or doubled days later, when already_succeeded() reads it and believes it.',
-          'Nếu không thì một lần crash giữa lúc commit dữ liệu và lúc cập nhật ledger sẽ khiến ledger NÓI SAI — nó báo failed cho dữ liệu thật ra đã có, hoặc báo success cho dữ liệu không tồn tại. Và ledger nói sai sẽ biến thành ngày bị bỏ qua hoặc bị nhân đôi về sau, khi hàm already_succeeded() đọc nó và tin nó.',
+          'Because of when it fails, and how clearly. A full disk discovered by preflight costs you one FAIL line and zero seconds. The same disk discovered forty minutes into a load costs you the forty minutes, plus an error message about temp files that says nothing about disks. A11\'s backfill runner calls preflight before every single day for exactly this reason.',
+          'Vì nó hỏng vào lúc nào, và hỏng rõ ràng tới đâu. Một cái đĩa đầy mà preflight phát hiện ra thì bạn mất một dòng FAIL và không mất giây nào. Cũng cái đĩa đó mà phát hiện ra khi đã nạp được bốn mươi phút thì bạn mất bốn mươi phút, cộng thêm một thông báo lỗi về file tạm chẳng nói gì tới đĩa. Runner backfill của A11 gọi preflight trước từng ngày một, đúng vì lý do này.',
         ),
       },
     ],
@@ -194,44 +210,54 @@ export const a07Theory: TheorySection[] = [
   {
     level: 'detail',
     heading: bi(
-      'Where run facts live, and two habits that ride along',
-      'Sự thật về lần chạy nằm ở đâu, và hai thói quen đi kèm',
+      'What today does not promise, and the habits that ride along',
+      'Hôm nay không hứa cái gì, và mấy thói quen đi kèm',
     ),
     paras: [
       bi(
-        'This assignment collects on A03\'s restraint. A03 gave every row exactly two warehouse-added columns, _data_date and _run_id, and said the file name and the load timestamp did NOT belong there because they are facts about the RUN, not about the order. Today you build the place they do belong: ops.etl_runs carries source_file and finished_at, one row per attempt, and _run_id is the pointer.',
-        'Bài này thu hoạch lại sự kiềm chế của A03. A03 cho mỗi dòng đúng hai cột do warehouse thêm vào, _data_date và _run_id, và nói rằng tên file cùng thời điểm nạp KHÔNG thuộc về đó, vì chúng là sự thật về LẦN CHẠY chứ không phải về đơn hàng. Hôm nay bạn dựng đúng chỗ mà chúng thuộc về: bảng ops.etl_runs mang source_file và finished_at, mỗi lần thử một dòng, và _run_id là con trỏ.',
+        'Be precise about the promise. Today makes the OPERATION safe: re-running a day replaces that day cleanly. It does not make the CONTENT converge. The same order_id still appears in several files, because about 1.5% of every file is late corrections, and nothing here decides which version wins. That is A08\'s job.',
+        'Phải nói cho chính xác về lời hứa. Hôm nay làm cho THAO TÁC an toàn: chạy lại một ngày thì ngày đó được thay sạch sẽ. Nó không làm cho NỘI DUNG hội tụ. Cùng một order_id vẫn xuất hiện ở nhiều file, vì khoảng 1,5% mỗi file là bản sửa về trễ, mà ở đây chưa có gì quyết định phiên bản nào thắng. Đó là việc của A08.',
       ),
       bi(
-        'Say the win out loud, because it is the whole argument: a fact about the run is stored ONCE, on the run, and 62,707 rows point at it with an 8-byte id — instead of 62,707 identical copies of a file name and a timestamp sitting in a fact table. That is plain normalization, the same rule that keeps a customer\'s address out of every order row.',
-        'Hãy nói to điều được lợi ở đây, vì nó là toàn bộ lập luận: một sự thật về lần chạy được lưu MỘT LẦN, ở lần chạy đó, và 62.707 dòng trỏ tới nó bằng một id 8 byte — thay vì 62.707 bản sao giống hệt nhau của một tên file và một dấu thời gian nằm trong fact table. Đó chính là normalization thông thường, cùng quy tắc giữ cho địa chỉ khách hàng không bị chép vào từng dòng đơn hàng.',
+        'A design point that costs nothing and pays forever: DELETE WHERE _data_date = D runs on the first load too. It deletes zero rows. Keeping it means there is one code path instead of two, and the path that runs daily is the same one that runs during a recovery. Fewer paths, fewer bugs.',
+        'Có một chỗ trong thiết kế chẳng tốn gì mà lời mãi: câu DELETE WHERE _data_date = D chạy cả ở lần nạp đầu tiên. Nó xoá 0 dòng. Giữ nó lại nghĩa là bạn có một nhánh code thay vì hai, và cái nhánh chạy hằng ngày cũng chính là nhánh chạy lúc khắc phục sự cố. Ít nhánh thì ít lỗi.',
       ),
       bi(
-        'It also pays maintenance: re-load this day from a corrected file and the ledger records the new fact in ONE row; the copy-it-everywhere design would have to rewrite the same string 62,707 times to fix a single fact — 1.2M times at full scale.',
-        'Nó cũng có lợi về bảo trì: nạp lại ngày này từ một file đã sửa thì ledger ghi sự thật mới vào MỘT dòng; còn thiết kế chép-khắp-nơi sẽ phải ghi lại cùng một chuỗi 62.707 lần chỉ để sửa một sự thật — và 1,2 triệu lần ở scale full.',
+        'The retry wrapper needs a give-up. Retrying forever is not resilience, it is a job that never reports failure — the worst possible outcome, because a pipeline that never says it failed is a pipeline nobody looks at. After the last attempt, write an ops.alerts row and stop.',
+        'Cái vòng thử lại phải biết bỏ cuộc. Thử lại mãi mãi không phải là bền bỉ, đó là một job không bao giờ báo hỏng — kết cục tệ nhất có thể, vì một pipeline không bao giờ nói mình hỏng là một pipeline không ai buồn nhìn tới. Sau lần thử cuối cùng thì ghi một dòng vào ops.alerts rồi dừng.',
       ),
       bi(
-        'PREFLIGHT is the first habit that rides along. Think about what actually breaks pipelines at 2 a.m. — rarely the SQL. The disk is full. The file never arrived. Another process is holding the database. A config quietly aims temp space at the OS drive. Every one of those is checkable in under a second, BEFORE any data moves, and each check must print a fix hint and exit non-zero so a scheduler stops cold. A red report that still exits 0 is a smoke alarm with no battery.',
-        'PREFLIGHT là thói quen thứ nhất đi kèm. Hãy nghĩ xem thứ gì thật sự làm hỏng pipeline lúc 2 giờ sáng — hiếm khi là SQL. Ổ đĩa đầy. File chưa bao giờ về tới. Một process khác đang giữ database. Một dòng cấu hình lặng lẽ trỏ chỗ chứa file tạm về ổ hệ thống. Mỗi thứ đó đều kiểm tra được trong chưa tới một giây, TRƯỚC KHI dữ liệu di chuyển, và mỗi phép kiểm tra phải in ra gợi ý cách sửa cùng mã thoát khác 0 để scheduler dừng hẳn. Một báo cáo đỏ mà vẫn thoát với mã 0 là chuông báo cháy không lắp pin.',
+        'Two habits stop being theory today. A preflight checks the environment before any data moves — disk, permissions, temp directory, the warehouse file, the source file, the manifest — and reports one PASS or FAIL line each. And a git savepoint right before deliberately breaking things turns "I mangled the loader I spent two hours on" from a disaster into one command.',
+        'Hôm nay có hai thói quen thôi nằm trên giấy. Preflight kiểm môi trường trước khi có dữ liệu nào dịch chuyển — đĩa, quyền, thư mục tạm, file warehouse, file nguồn, manifest — mỗi thứ một dòng PASS hoặc FAIL. Còn một cái savepoint trên git ngay trước khi cố tình phá đồ thì biến chuyện "tôi vừa băm nát cái loader làm hai tiếng mới xong" từ thảm hoạ thành một câu lệnh.',
       ),
       bi(
-        'The GIT SAVEPOINT is the second. An assignment that breaks things on purpose, with edits made quickly and under pressure, is exactly the setting where a botched edit eats a file you spent two hours getting right. Commit before the chaos work; then git restore recovers an uncommitted mess, git checkout <sha> -- <file> recovers a committed one, and git reflog proves even reset-away commits survive.',
-        'GIT SAVEPOINT là thói quen thứ hai. Một bài học cố ý phá hỏng mọi thứ, với những lần sửa code vội vàng và căng thẳng, chính là hoàn cảnh mà một lần sửa hỏng tay có thể nuốt mất file bạn mất hai giờ mới viết đúng. Hãy commit trước khi bắt đầu phần phá hoại; sau đó git restore cứu được đống hỗn độn chưa commit, git checkout <sha> -- <file> cứu được cái đã commit, và git reflog chứng minh rằng ngay cả những commit bị reset đi cũng vẫn còn.',
+        'One nice thing to notice: you have already been using an idempotent tool without calling it that. datagen/generate.py skips files that already exist unless you pass --force. Same property, same reason.',
+        'Có một chuyện thú vị đáng để ý: bạn đã dùng một công cụ idempotent từ lâu mà không gọi nó bằng cái tên đó. Script datagen/generate.py bỏ qua những file đã tồn tại, trừ khi bạn truyền cờ --force. Cùng một tính chất, cùng một lý do.',
       ),
       bi(
-        'One last thing worth noticing: you have already used an idempotent tool without thinking about it. datagen/generate.py skips existing files unless you pass --force. That flag is the same design decision you are making today.',
-        'Một điều cuối đáng để ý: bạn đã dùng một công cụ idempotent mà không nghĩ tới. Script datagen/generate.py bỏ qua các file đã tồn tại trừ khi bạn truyền --force. Chính cờ đó là cùng một quyết định thiết kế mà hôm nay bạn đang đưa ra.',
+        'And this is the floor everything above stands on. A09 protects readers during a rewrite, A11 replays this loader over 69 days, and every orchestrator you will ever touch — Airflow, Dagster, dbt — assumes your tasks already have the property you built today. They do not give it to you. They assume it.',
+        'Và đây là cái nền mà mọi thứ phía trên đứng lên. A09 lo cho người đọc trong lúc dữ liệu đang được ghi lại, A11 chạy lại chính cái loader này trên 69 ngày, còn mọi công cụ điều phối bạn từng đụng tới — Airflow, Dagster, dbt — đều mặc định rằng task của bạn vốn đã có tính chất bạn dựng hôm nay. Chúng không cho bạn tính chất đó. Chúng cho rằng bạn đã có.',
       ),
     ],
     checks: [
       {
         q: bi(
-          'The checksum is identical after a re-run, but _run_id changed. Is that a bug?',
-          'Checksum giống hệt sau khi chạy lại, nhưng _run_id đã đổi. Đó có phải lỗi không?',
+          'A chaos run failed four times, then succeeded. What should the ledger look like?',
+          'Một lần chạy có phá hoại hỏng bốn lần rồi mới thành công. Ledger lúc đó nên trông thế nào?',
         ),
         a: bi(
-          'No — that is lineage recording history, not data changing. The checksum deliberately hashes only BUSINESS columns; _run_id SHOULD differ between two runs, and so should the finished_at on the ledger row it points at. Hashing lineage into the checksum would make idempotency impossible to prove.',
-          'Không — đó là lineage đang ghi lại lịch sử, không phải dữ liệu thay đổi. Checksum cố ý chỉ hash các cột NGHIỆP VỤ; _run_id ĐÁNG LẼ phải khác nhau giữa hai lần chạy, và finished_at trên dòng ledger mà nó trỏ tới cũng vậy. Nếu hash cả cột lineage vào checksum thì sẽ không bao giờ chứng minh được tính idempotent.',
+          'Five rows for that date: four failed, each naming the point it died at, then one success. Not one row overwritten five times. The four failures are how you later answer "was this day flaky, or did it break once?" — and that question comes up during incidents, when guessing is expensive.',
+          'Năm dòng cho ngày đó: bốn dòng failed, mỗi dòng gọi tên chỗ nó chết, rồi một dòng success. Không phải một dòng bị ghi đè năm lần. Bốn lần hỏng đó chính là thứ sau này giúp bạn trả lời câu "ngày này chập chờn hay chỉ hỏng đúng một lần" — mà câu đó hay được hỏi giữa lúc có sự cố, lúc mà đoán mò rất đắt.',
+        ),
+      },
+      {
+        q: bi(
+          'Four runs — one clean, three under chaos — give four identical checksums. What has that proved, and what has it not?',
+          'Bốn lần chạy — một lần sạch, ba lần có phá hoại — cho ra bốn checksum giống hệt nhau. Điều đó chứng minh được gì, và chưa chứng minh được gì?',
+        ),
+        a: bi(
+          'Proved: the operation is idempotent — crashes at any of the four points leave the same final state as a clean run. Not proved: that the content is right. The checksum only says every run agrees with every other run, not that they agree with reality. Validation against the manifest is what covers that, and it is a separate step for a reason.',
+          'Chứng minh được: thao tác này idempotent — chết ở bất kỳ điểm nào trong bốn điểm cũng để lại trạng thái cuối giống hệt một lần chạy sạch. Chưa chứng minh được: nội dung có đúng hay không. Checksum chỉ nói mọi lần chạy khớp với nhau, chứ không nói chúng khớp với thực tế. Phần đó thuộc về bước validate với manifest, và nó là một bước riêng vì lý do đó.',
         ),
       },
     ],
@@ -240,35 +266,11 @@ export const a07Theory: TheorySection[] = [
 
 export const a07Terms: Term[] = [
   {
-    term: 'Idempotency',
-    gloss: 'chạy lại bao nhiêu lần cũng ra một kết quả',
+    term: 'Idempotent',
+    gloss: 'chạy mấy lần cũng ra một kết quả',
     means: bi(
-      'Running an operation once or ten times leaves the system in the same final state. An elevator call button is idempotent; a "top up by $10" button is not.',
-      'Chạy một thao tác một lần hay mười lần đều để lại hệ thống ở cùng trạng thái cuối. Nút gọi thang máy là idempotent; nút "nạp thêm 10 đô" thì không.',
-    ),
-    source: {
-      name: 'dbt — Incremental models',
-      url: 'https://docs.getdbt.com/docs/build/incremental-models',
-    },
-  },
-  {
-    term: 'Transaction / ACID atomicity',
-    gloss: 'khối được ăn cả ngã về không',
-    means: bi(
-      'BEGIN…COMMIT groups statements into one all-or-nothing unit. Nothing is visible until COMMIT; if the process dies first, it is as if nothing ran. This removes both "half data" and "missing data".',
-      'BEGIN…COMMIT gom các câu lệnh thành một khối được ăn cả ngã về không. Không gì hiển thị ra cho tới COMMIT; nếu process chết trước thì coi như chưa chạy gì. Điều này loại bỏ cả kiểu "dữ liệu một nửa" lẫn "mất dữ liệu".',
-    ),
-    source: {
-      name: 'DuckDB — Transaction management',
-      url: 'https://duckdb.org/docs/sql/statements/transactions',
-    },
-  },
-  {
-    term: 'Delete-then-insert',
-    gloss: 'xoá đúng phần mình sắp ghi, rồi ghi',
-    means: bi(
-      'The idempotent publish pattern: DELETE WHERE _data_date = D, then INSERT, both inside one transaction. Re-run = replace. DELETE runs even on the first load so first run and re-run share one code path.',
-      'Khuôn publish idempotent: DELETE WHERE _data_date = D rồi INSERT, cả hai trong một transaction. Chạy lại = thay thế. Lệnh DELETE chạy cả ở lần đầu để lần chạy đầu và lần chạy lại đi chung một nhánh code.',
+      'Running an operation once or ten times leaves the system in the same final state. An elevator call button is idempotent; a "top up my account by $10" button is not.',
+      'Chạy một lần hay mười lần thì hệ thống cũng dừng ở cùng một trạng thái. Nút gọi thang máy là idempotent; nút "nạp thêm 10 đô vào tài khoản" thì không.',
     ),
     source: {
       name: 'dbt — Incremental strategies',
@@ -277,86 +279,86 @@ export const a07Terms: Term[] = [
   },
   {
     term: 'Unit of work',
-    gloss: 'đơn vị công việc thay thế được',
+    gloss: 'phần nhỏ nhất mà bạn thay nguyên cục',
     means: bi(
-      'The chunk your pipeline replaces wholesale on a re-run. Here: one source file (one day). Re-runnability should cost the size of one unit, not the size of the warehouse.',
-      'Khối dữ liệu mà pipeline thay thế trọn vẹn khi chạy lại. Ở đây là một file nguồn, tức một ngày. Khả năng chạy lại phải tốn bằng kích thước một đơn vị, không phải bằng kích thước cả warehouse.',
+      'The slice a re-run replaces whole. Here it is one source file — one day\'s CSV — and every row carries that day in _data_date, so publishing can delete exactly what it is about to write.',
+      'Phần dữ liệu mà một lần chạy lại sẽ thay nguyên cục. Ở đây là một file nguồn, tức CSV của một ngày, và mọi dòng đều mang ngày đó ở cột _data_date, nên lúc công bố có thể xoá đúng phần sắp ghi.',
+    ),
+  },
+  {
+    term: 'Transaction',
+    gloss: 'một khối trọn-hoặc-không',
+    means: bi(
+      'Statements grouped into one all-or-nothing unit: after BEGIN nothing is visible until COMMIT, and if the process dies first it is as if nothing ran. DuckDB guarantees this even when the process is killed outright.',
+      'Nhiều câu lệnh gom thành một khối trọn-hoặc-không: sau BEGIN thì chưa ai thấy gì cho tới COMMIT, còn tiến trình chết trước đó thì coi như chưa có gì chạy. DuckDB bảo đảm điều này kể cả khi tiến trình bị giết thẳng.',
     ),
     source: {
-      name: 'Airflow — DAG runs',
-      url: 'https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dag-run.html',
+      name: 'DuckDB — Transaction management',
+      url: 'https://duckdb.org/docs/stable/sql/statements/transactions',
     },
   },
   {
-    term: 'Run ledger (ops.etl_runs)',
-    gloss: 'sổ cái các lần chạy',
+    term: 'Delete + insert',
+    gloss: 'xoá đúng phần sắp ghi, rồi ghi',
     means: bi(
-      'One row per ATTEMPT: date, step, status, rows, source_file, error. Answers "did yesterday load?" with a query instead of a guess. Failures are history worth keeping, not shame to overwrite.',
-      'Mỗi LẦN THỬ một dòng: ngày, bước, trạng thái, số dòng, tên file nguồn, lỗi. Trả lời câu "hôm qua có load không?" bằng truy vấn thay vì phỏng đoán. Những lần thất bại là lịch sử đáng giữ, không phải điều đáng che.',
+      'DELETE WHERE _data_date = D, then INSERT, inside one transaction. It runs on the first load too, deleting zero rows — so first run and re-run are the same code path.',
+      'Chạy DELETE WHERE _data_date = D rồi INSERT, trong cùng một transaction. Nó chạy cả ở lần nạp đầu tiên, xoá 0 dòng — nhờ vậy lần đầu và lần chạy lại dùng chung một nhánh code.',
     ),
     source: {
-      name: 'dbt — Data lineage',
-      url: 'https://docs.getdbt.com/terms/data-lineage',
+      name: 'dbt — Incremental strategies',
+      url: 'https://docs.getdbt.com/docs/build/incremental-strategy',
     },
+  },
+  {
+    term: 'Run ledger',
+    gloss: 'sổ ghi mọi lần chạy, không ghi đè',
+    means: bi(
+      'ops.etl_runs: one row per attempt, carrying date, step, status, row count, source_file, finished_at and error. Failures are history worth keeping, not shame to overwrite.',
+      'Bảng ops.etl_runs: mỗi lần thử một dòng, ghi ngày, bước, trạng thái, số dòng, tên file nguồn, thời điểm kết thúc và lỗi. Những lần hỏng là lịch sử đáng giữ, không phải chuyện xấu hổ cần ghi đè lên.',
+    ),
+  },
+  {
+    term: 'Lineage pointer',
+    gloss: '_run_id trỏ về lần chạy, thay vì chép mọi thứ xuống từng dòng',
+    means: bi(
+      'The file name and load timestamp are facts about the run, so they live once on ops.etl_runs and 62,707 rows point at them with an 8-byte id. Re-load from a corrected file and one ledger row changes, not 62,707 strings.',
+      'Tên file và thời điểm nạp là sự thật về lần chạy, nên chúng nằm một lần trên ops.etl_runs và 62.707 dòng trỏ tới qua một id 8 byte. Nạp lại từ một file đã sửa thì chỉ một dòng ledger đổi, chứ không phải 62.707 chuỗi.',
+    ),
   },
   {
     term: 'Transient vs deterministic failure',
-    gloss: 'lỗi tạm thời so với lỗi tất định',
+    gloss: 'hỏng nhất thời và hỏng lần nào cũng hỏng',
     means: bi(
-      'Transient (network blip, locked file) is worth retrying. Deterministic (corrupt file, failed validation) just fails again, slower. Catch TransientError only; let ValueError fly.',
-      'Lỗi tạm thời (mạng chớp tắt, file bị khoá) thì đáng thử lại. Lỗi tất định (file hỏng, validation không đạt) thì thử lại vẫn hỏng, chỉ chậm hơn. Chỉ bắt TransientError; để ValueError bay thẳng ra.',
+      'A network blip or a briefly locked file is worth retrying. A corrupt file or a failed validation will fail again, slower. Your code has to tell them apart, or the retry loop just wastes time on the second kind.',
+      'Mạng chớp một cái hay file bị khoá trong chốc lát thì đáng thử lại. File hỏng hay validate không qua thì thử lại cũng hỏng, chỉ chậm hơn. Code phải phân biệt được hai loại, không thì vòng thử lại chỉ phí thời gian cho loại thứ hai.',
     ),
-    source: {
-      name: 'Google SRE Book — Handling overload',
-      url: 'https://sre.google/sre-book/handling-overload/',
-    },
   },
   {
     term: 'Exponential backoff',
-    gloss: 'thời gian chờ nhân đôi dần',
+    gloss: 'chờ lâu dần giữa các lần thử lại',
     means: bi(
-      'Wait 1s, 2s, 4s, 8s between retries instead of hammering a struggling system. Add jitter (random 0.5–1.5×) so many workers do not stampede together after the same outage.',
-      'Chờ 1 giây, 2 giây, 4 giây, 8 giây giữa các lần thử lại thay vì dồn ép một hệ thống đang vật vã. Thêm jitter (nhân ngẫu nhiên 0,5 tới 1,5 lần) để nhiều worker không cùng ùa vào sau một sự cố.',
+      'Doubling waits — 1s, 2s, 4s, 8s — so a struggling system gets air instead of being hammered. Pair it with a give-up: retrying forever is a job that never reports failure.',
+      'Thời gian chờ nhân đôi dần — 1, 2, 4, 8 giây — để một hệ thống đang đuối có chỗ thở thay vì bị nện liên tục. Phải đi kèm một mốc bỏ cuộc: thử lại mãi mãi nghĩa là một job không bao giờ báo hỏng.',
     ),
-    source: {
-      name: 'Google SRE Book — Handling overload',
-      url: 'https://sre.google/sre-book/handling-overload/',
-    },
   },
   {
-    term: 'Preflight check',
-    gloss: 'kiểm tra môi trường trước khi chạy',
+    term: 'Preflight',
+    gloss: 'kiểm môi trường trước khi động vào dữ liệu',
     means: bi(
-      'Seven environment checks before any data moves: disk space, temp location, source file present, DB not locked, schemas creatable, contract parseable. Each prints a fix hint; any FAIL exits non-zero.',
-      'Bảy phép kiểm tra môi trường trước khi dữ liệu di chuyển: dung lượng đĩa, vị trí thư mục tạm, file nguồn có mặt, database không bị khoá, schema tạo được, contract parse được. Mỗi cái in ra gợi ý sửa; chỉ cần một cái FAIL là thoát với mã khác 0.',
+      'Disk, permissions, temp directory, warehouse file, source file, manifest — one PASS or FAIL line each, before anything moves. A full disk caught here costs one line; caught forty minutes in, it costs forty minutes.',
+      'Kiểm đĩa, quyền, thư mục tạm, file warehouse, file nguồn, manifest — mỗi thứ một dòng PASS hoặc FAIL, trước khi có gì dịch chuyển. Một cái đĩa đầy bắt được ở đây thì mất một dòng; bắt được sau bốn mươi phút thì mất bốn mươi phút.',
     ),
-    source: {
-      name: 'Google SRE Book — Release engineering',
-      url: 'https://sre.google/sre-book/release-engineering/',
-    },
   },
   {
-    term: 'Chaos engineering',
-    gloss: 'cố ý gây lỗi để kiểm chứng',
+    term: 'Chaos testing',
+    gloss: 'cố tình cho chết ở những chỗ tệ nhất',
     means: bi(
-      'Injecting failures on purpose to prove a system survives them. A pipeline that has never crashed mid-flight is untested — especially between DELETE and INSERT, the crash that would lose a day without a transaction.',
-      'Cố ý tiêm lỗi vào để chứng minh hệ thống sống sót được. Một pipeline chưa từng crash giữa chừng là pipeline chưa được kiểm thử — nhất là ở đoạn giữa DELETE và INSERT, lần crash sẽ làm mất một ngày dữ liệu nếu không có transaction.',
+      'Injecting failures at chosen points — after staging, mid-transaction, before commit — to check the recovery you designed actually works. Verifying by checksum rather than by hope.',
+      'Cố tình gây lỗi ở những điểm đã chọn — sau khi stage, giữa transaction, ngay trước commit — để kiểm xem cách khắc phục bạn thiết kế có chạy thật không. Kiểm bằng checksum chứ không bằng hy vọng.',
     ),
     source: {
-      name: 'Principles of Chaos Engineering',
-      url: 'https://principlesofchaos.org/',
-    },
-  },
-  {
-    term: 'Order-independent checksum',
-    gloss: 'checksum không phụ thuộc thứ tự dòng',
-    means: bi(
-      'bit_xor(hash(cols)) gives the same value for the same set of rows regardless of order — the tool that proves two runs produced identical data. Hash only BUSINESS columns: lineage should differ between runs.',
-      'Hàm bit_xor(hash(các cột)) cho cùng một giá trị với cùng một tập dòng bất kể thứ tự — công cụ chứng minh hai lần chạy tạo ra dữ liệu giống hệt nhau. Chỉ hash các cột NGHIỆP VỤ: cột lineage đáng lẽ phải khác nhau giữa các lần chạy.',
-    ),
-    source: {
-      name: 'DuckDB — Aggregate functions',
-      url: 'https://duckdb.org/docs/sql/functions/aggregates',
+      name: 'Netflix — Chaos Monkey',
+      url: 'https://netflix.github.io/chaosmonkey/',
     },
   },
 ]

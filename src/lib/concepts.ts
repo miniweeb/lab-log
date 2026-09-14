@@ -812,4 +812,121 @@ export const DEFAULT_CONCEPTS: ConceptItem[] = [
       "url": "https://iceberg.apache.org/docs/latest/maintenance/"
     }
   },
+    {
+    "id": "c_schema_evolution_era",
+    "subject": "Pipeline Lifecycle",
+    "term": "62. Schema evolution — lịch sử không được viết lại theo",
+    "pronounceOrType": "Dữ liệu vào đổi hình dạng giữa chừng",
+    "definition": "Sớm muộn gì bên cung cấp dữ liệu cũng đổi cấu trúc file họ gửi. Chỗ nhiều người nhầm là tưởng đây giống một lần nâng cấp: đổi xong thì mọi thứ về lại một mối. Thực tế thì phần dữ liệu bạn đã nhận trước đó chẳng ai viết lại cho, nên từ ngày đó trở đi pipeline phải đọc được nhiều hình dạng cùng một lúc, và chuyện đó kéo dài mãi về sau. Mỗi khoảng ngày mà cấu trúc giữ nguyên được gọi là một era, và bạn sẽ mang theo tất cả các era chứ không chỉ era mới nhất.",
+    "formulaOrSyntax": "-- Muốn biết cấu trúc đã đổi vào ngày nào, hãy gom các file theo dòng header:\nfor f in sorted(raw_dir.glob('orders_*.csv')):\n    header = open(f, encoding='utf-8').readline().strip()\n    sigs.setdefault(header, []).append(f.name)\n\n-- Một feed 69 file có thể gom lại thành đúng ba nhóm header,\n-- và ranh giới giữa các nhóm chính là ngày bên cung cấp đổi cấu trúc.",
+    "pitfall": "Đừng dò bằng kiểu dữ liệu mà engine tự đoán ra. Kiểu đoán ra dao động giữa file này với file kia vì những lý do chẳng liên quan gì tới cấu trúc, chẳng hạn một ngày mà cột nào đó tình cờ không có giá trị rỗng sẽ được đoán khác với ngày có. Dòng header thì chỉ là một dòng, đọc chẳng tốn gì, và nó chỉ đổi khi bên cung cấp thật sự đổi nó.",
+    "sourceLink": {
+      "text": "Apache Iceberg — quy tắc schema evolution",
+      "url": "https://iceberg.apache.org/spec/#schema-evolution"
+    }
+  },
+  {
+    "id": "c_silent_schema_change",
+    "subject": "Quality Gate",
+    "term": "63. Thay đổi làm chương trình chết là thay đổi dễ chịu nhất",
+    "pronounceOrType": "Xếp loại mức nguy hiểm của một thay đổi",
+    "definition": "Khi dữ liệu nguồn đổi, có loại làm chương trình dừng lại kèm thông báo lỗi, và có loại nạp vào dữ liệu sai rồi báo là thành công. Loại thứ nhất tuy phiền nhưng thật ra là món quà, vì nó dừng pipeline và trong vài phút bạn đã có manh mối. Loại thứ hai mới đáng sợ, và nó chiếm phần lớn: trong một đợt thay đổi thật, sáu trên bảy thay đổi thuộc loại im lặng. Đỉnh điểm của loại im lặng là khi bên cung cấp giữ nguyên tên cột, kiểu dữ liệu và quy định cho phép rỗng, mà chỉ đổi ý nghĩa của con số bên trong.",
+    "formulaOrSyntax": "-- Trước:  order_total là tổng tiền các mặt hàng\n-- Sau:    order_total là tổng tiền các mặt hàng đã trừ giảm giá\n\n-- Còn schema thì giống hệt nhau ở cả hai thời kỳ:\n--   order_total  DECIMAL(14,2)  NOT NULL\n-- Một cổng kiểm dựa trên schema không có gì để mà bắt.",
+    "pitfall": "Đổi tên hay đổi kiểu ít ra còn để lại dấu vết, vì có một cột biến mất hoặc một phép join không khớp, đem schema ra đối chiếu là thấy. Còn đổi ý nghĩa thì không dòng code nào phải sửa, mọi bên tiêu thụ vẫn chạy trơn tru, vẫn ra số, và số đó sai ở mọi đơn có giảm giá. Nó chỉ lộ ra khi có người phát hiện báo cáo tài chính lệch, thường là vài tuần sau. Cũng vì thế, điều khoản quản lý thay đổi trong contract nên xếp việc đổi ý nghĩa ngang hàng với đổi kiểu; nếu điều khoản chỉ liệt kê đổi tên, xoá cột và đổi kiểu thì bên cung cấp hoàn toàn có thể lập luận rằng họ chẳng vi phạm gì.",
+    "sourceLink": {
+      "text": "Data Contract Specification — phân loại mức độ thay đổi",
+      "url": "https://datacontract.com/"
+    }
+  },
+  {
+    "id": "c_canonical_schema",
+    "subject": "Data Modeling",
+    "term": "64. Canonical schema — dịch một lần ở cửa, phía sau khỏi biết",
+    "pronounceOrType": "Cách gộp nhiều era về một hình dạng",
+    "definition": "Khi đã có nhiều era, câu hỏi là ai sẽ chịu phần việc dịch chúng về một mối. Nếu không ai chịu thì mọi bên tiêu thụ đều phải tự xoay xở, và mỗi người sẽ xoay một kiểu. Cách gọn hơn là định nghĩa đúng một schema đích rồi đặt ngay ở cửa vào một lớp dịch mỏng cho từng era. Nhờ vậy mọi thứ phía sau chỉ nhìn thấy một hình dạng duy nhất và không bao giờ phải biết một dòng đến từ era nào.",
+    "formulaOrSyntax": "file era v1 -+\nfile era v2 -+-> lớp dịch riêng từng era -> lớp làm sạch dùng chung -> schema đích\nfile era v3 -+    (đổi tên, dựng khoá,       (không biết gì về era)\n                   thêm cột còn thiếu)\n\n-- Kiến thức về era nằm đúng ở một chỗ.\n-- Có thêm era thứ tư thì chỉ tốn thêm một lớp dịch, phía sau không phải sửa gì.",
+    "pitfall": "Hãy tách lớp dịch schema ra khỏi lớp làm sạch giá trị, đừng gộp thành mỗi era một câu lệnh làm tất cả. Gộp lại thì các quy tắc làm sạch bị chép thành nhiều bản, và tới lúc sửa một định dạng ngày tháng thì bạn sửa được hai chỗ rồi quên chỗ thứ ba, mà chính bản bị quên sẽ gây ra sự cố. Một điểm nữa dễ làm ngược: khi đổi tên, hãy ánh xạ về cái tên mà phần lịch sử và các bảng phía sau đang dùng, chứ đừng đổi lịch sử cho khớp với era mới nhất, vì làm vậy là phải sửa mọi thứ phía sau trong khi cả mục đích của cách làm này là để phía sau không phải nhúc nhích.",
+    "sourceLink": {
+      "text": "SQLMesh — model kinds và contract ở mức cột",
+      "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/models/model_kinds/"
+    }
+  },
+  {
+    "id": "c_backfill_default",
+    "subject": "Cleansing",
+    "term": "65. Chỗ thiếu đã biết thì điền, không biết mới để rỗng",
+    "pronounceOrType": "Quy tắc khi thêm cột cho dữ liệu cũ",
+    "definition": "Khi dữ liệu cũ không có một cột mà schema đích yêu cầu, bạn phải quyết cho từng cột một: giá trị đang thiếu đó là thứ bạn biết chắc, hay là thứ không ai từng ghi lại? Biết chắc thì điền giá trị thật vào; không biết thì để rỗng. Nghe thì giống nhau, nhưng hậu quả của hai lựa chọn ngược hẳn nhau, và đây là chỗ quyết định xem các phép đối soát của bạn về sau có dùng được trên toàn bộ lịch sử hay không.",
+    "formulaOrSyntax": "-- Cùng một thời kỳ dữ liệu cũ, bốn cột nhưng hai cách xử lý:\ncurrency        -> 'USD'   -- biết chắc: thời kỳ đó chỉ dùng một loại tiền tệ\ndiscount_amount -> 0       -- biết chắc: khi đó chưa có cơ chế giảm giá\nchannel         -> NULL    -- không biết: không ai từng đo\nloyalty_tier    -> NULL    -- không biết",
+    "pitfall": "Điền số 0 vào cột giảm giá của dữ liệu cũ chính là thứ khiến một công thức đối soát viết cho thời kỳ mới vẫn đúng trên toàn bộ lịch sử, đo được khoảng 99,4% ở cả ba thời kỳ. Nếu để rỗng thì phép trừ ra rỗng, mọi so sánh sau đó cũng ra rỗng, và toàn bộ dữ liệu cũ lặng lẽ rơi ra khỏi phép kiểm; cột đếm số dòng đạt sẽ ra 0 mà không lỗi nào báo. Ở chiều ngược lại, tự chọn đại một giá trị cho cột chưa ai từng ghi thì đó là bịa dữ liệu, và cái sai này còn khó gỡ hơn vì nó trông y như dữ liệu thật.",
+    "sourceLink": {
+      "text": "Delta Lake protocol — cập nhật schema tự động",
+      "url": "https://docs.delta.io/latest/delta-batch.html#automatic-schema-update"
+    }
+  },
+  {
+    "id": "c_positional_column_mapping",
+    "subject": "SQL & Engine",
+    "term": "66. Khai schema tường minh thì khớp theo vị trí, không theo tên",
+    "pronounceOrType": "Cách engine đọc file có schema khai sẵn",
+    "definition": "Khai sẵn danh sách cột khi đọc CSV là cách phòng thân đúng đắn, vì nó chặn được chuyện engine tự đoán sai kiểu. Nhưng nó có một mặt trái ít người biết: engine gán tên theo đúng thứ tự bạn viết ra, còn dòng header trong file thì chỉ bị bỏ qua chứ không hề được đem ra đối chiếu. Nghĩa là nếu bên cung cấp đổi thứ tự cột mà bạn vẫn khai theo thứ tự cũ, giá trị sẽ rơi vào sai cột.",
+    "formulaOrSyntax": "read_csv(path, header=true, columns=COLS)\n-- COLS gán tên theo VỊ TRÍ; dòng header chỉ bị bỏ qua\n\n-- Bên cung cấp đẩy cột mã tiền tệ lên trước cột chứa JSON.\n-- Khai theo thứ tự cũ thì chuỗi 'USD' được nạp vào cột JSON,\n-- và không lỗi nào được ném ra, vì cả hai cột đều là kiểu chuỗi.",
+    "pitfall": "Loader sẽ không giúp bạn phát hiện chuyện này, bởi nó chẳng có gì để phàn nàn: mọi cột đều là chuỗi và mọi giá trị đều vừa chỗ. Cách duy nhất là tự nhìn. Mỗi lần khai một schema mới, hãy đọc thử vài dòng rồi kiểm tay hai giá trị, chẳng hạn cột chứa JSON có còn giống JSON không và cột mã tiền tệ có còn giống mã tiền tệ không. Việc đó mất vài giây và chỉ phải làm một lần cho mỗi era mới.",
+    "sourceLink": {
+      "text": "DuckDB — tham số columns của read_csv",
+      "url": "https://duckdb.org/docs/stable/data/csv/overview"
+    }
+  },
+  {
+    "id": "c_key_ladder",
+    "subject": "Data Modeling",
+    "term": "67. Khoá của bên cung cấp có thể đổi kiểu ngay dưới chân bạn",
+    "pronounceOrType": "Ba nấc lựa chọn cho khoá chính",
+    "definition": "Khoá đi kèm dữ liệu và do bên cung cấp sinh ra thì có ý nghĩa sẵn, không tốn gì của bạn, nhưng nằm ngoài tầm kiểm soát. Tới ngày họ đổi nó từ số sang chuỗi có tiền tố, mọi bản sửa họ gửi về cho các đơn cũ đều trượt, bởi một chuỗi không bao giờ bằng một con số trong phép join. Từ đó có ba nấc lựa chọn: dùng thẳng khoá của họ, canonical hoá để bạn nắm phần định dạng còn họ giữ phần ý nghĩa, hoặc tự sinh khoá của riêng mình và giữ khoá gốc như một thuộc tính thường.",
+    "formulaOrSyntax": "-- Đo trên một file mang 705 bản sửa cho các đơn cũ:\n\n-- join theo khoá thô, không chuẩn hoá\nON v.order_id = CAST(h.order_id_num AS VARCHAR)     -->     0 / 705\n\n-- join sau khi cắt tiền tố và đưa về cùng một kiểu\nON CAST(replace(v.order_id,'ORD-','') AS BIGINT) = h.order_id_num\n                                                    -->   705 / 705\n\n-- Vì vậy giữ cả hai dạng: order_id VARCHAR và order_id_num BIGINT.",
+    "pitfall": "Con số 0 ở trên không có nghĩa là không có chuyện gì xảy ra, mà nghĩa là cả 705 bản sửa sẽ được thêm vào như những đơn hàng mới. Vẫn khách đó, vẫn số tiền đó, nhưng được đếm hai lần, và không có lỗi nào ở đâu cả. Còn nấc thứ ba, tức tự sinh khoá riêng, nghe an toàn nhất nhưng không miễn phí: mỗi lần nạp đều phải tra khoá, mà dữ liệu về trễ khiến phép tra đó phải với cả vào lịch sử chứ không chỉ lô hôm nay; mỗi lần dò lỗi ngược về nguồn cũng dài thêm một chặng. Và nó không xoá được phần chuẩn hoá, vì phép tra vẫn phải khớp chuỗi có tiền tố với con số cũ, phần đó chỉ chuyển vào bên trong bước gán khoá.",
+    "sourceLink": {
+      "text": "Kimball Group — surrogate keys",
+      "url": "https://www.kimballgroup.com/1998/05/surrogate-keys/"
+    }
+  },
+  {
+    "id": "c_contract_amendment",
+    "subject": "Quality Gate",
+    "term": "68. Contract sửa đổi theo phiên bản, không ghi đè bản cũ",
+    "pronounceOrType": "Cho contract tiến hoá cùng dữ liệu",
+    "definition": "Khi dữ liệu nguồn đổi hình dạng thì contract mô tả nó cũng phải đổi theo, nếu không cổng kiểm sẽ từ chối phần lớn dữ liệu một cách hoàn toàn đúng đắn. Nhưng bản sửa đổi không được ghi đè lên nội dung cũ, vì như thế bạn mất luôn khả năng kiểm lại phần lịch sử. Cách làm là mỗi bản mang mốc ngày bắt đầu có hiệu lực của riêng nó, để cổng kiểm giữ được nhiều phiên bản cùng lúc và kiểm mỗi file theo đúng phiên bản đang có hiệu lực vào ngày của file đó.",
+    "formulaOrSyntax": "contract v1  effective_from 2026-06-01\ncontract v2  effective_from 2026-07-16\ncontract v3  effective_from 2026-08-01\n\n-- Cổng kiểm chọn phiên bản theo ngày của file,\n-- nhưng nên đối chiếu thêm với header và cảnh báo khi hai bên bất đồng.",
+    "pitfall": "Có một luật nhỏ mà đắt: ngày trong tên file chỉ là siêu dữ liệu, còn header mới là dữ liệu. Khi hai bên mâu thuẫn, hãy tin cái quyết định việc đọc, tức header, nhưng phải ghi một dòng cảnh báo. Nếu tin vào ngày thì bạn sẽ đem schema của thời kỳ cũ ra đọc một file thuộc thời kỳ mới, giá trị rơi vào sai cột mà không lỗi nào báo. Ngoài ra, đừng đánh số phiên bản theo cảm tính: thêm vài cột mà bên tiêu thụ cũ có thể bỏ qua thì là thay đổi nhỏ, nhưng nếu đi kèm việc viết lại ý nghĩa của một quy tắc nghiệp vụ đang có thì phải coi là thay đổi lớn.",
+    "sourceLink": {
+      "text": "Data Contract Specification — versioning",
+      "url": "https://datacontract.com/"
+    }
+  },
+  {
+    "id": "c_structural_vs_drift",
+    "subject": "Quality Gate",
+    "term": "69. File không đọc được khác với file đổi cấu trúc",
+    "pronounceOrType": "Hai sự cố đòi hai cách xử lý khác nhau",
+    "definition": "Một file trượt cổng kiểm có thể vì bên cung cấp đổi cấu trúc, cũng có thể vì bản thân file hỏng ở mức ký tự nên không đọc nổi. Hai chuyện này đòi hai phản ứng khác hẳn nhau: đổi cấu trúc thì yêu cầu bên cung cấp tăng phiên bản và thông báo đúng quy trình, còn không đọc được thì báo sự cố truyền file. Cổng kiểm phải phân biệt được, nếu không nó đưa ra kết luận sai và bạn đi tìm một thay đổi chưa từng xảy ra.",
+    "formulaOrSyntax": "-- Hàm dò cấu trúc không ném lỗi với file hỏng, nó thoái hoá:\n-- mấy dòng gãy làm nhiễu việc dò dấu phân cách, nó chốt lấy một dấu\n-- vốn không có trong dữ liệu, rồi trả về ĐÚNG MỘT cột.\n\n-- Dấu hiệu nhận biết: schema dò ra co lại còn một cột duy nhất,\n-- mà tên của cột đó lại chứa dấu phẩy hoặc dấu nháy\n-- (thực chất là cả dòng header bị gộp thành một cái tên).",
+    "pitfall": "Không dạy cổng kiểm sự phân biệt này thì nó sẽ ngoan ngoãn báo là thiếu toàn bộ cột và có thêm một cột lạ khổng lồ, tức là kết luận đổi cấu trúc cho một file thật ra có đúng số cột như mọi file cùng thời kỳ, chỉ gãy ở mức byte. Nên xếp trường hợp này vào nhóm lỗi cấu trúc như một sự cố phía nhà cung cấp, chứ đừng xếp vào phần kiểm schema. Nửa còn lại của việc phát hiện là bọc thao tác đọc thử trong một khối bắt lỗi.",
+    "sourceLink": {
+      "text": "datacontract CLI — phân loại lỗi theo từng nhóm kiểm",
+      "url": "https://cli.datacontract.com/"
+    }
+  },
+  {
+    "id": "c_own_prior_changes",
+    "subject": "Reliability & Ops",
+    "term": "70. Đối soát với nguồn ngoài thì phải trừ đi những gì mình đã tự sửa",
+    "pronounceOrType": "Bước đầu tiên khi một phép đối soát không khớp",
+    "definition": "Bản kê khai mà bên cung cấp gửi kèm dữ liệu là một mốc đối chiếu rất tốt, nhưng nó chỉ biết về dữ liệu lúc rời khỏi tay họ. Nó không biết gì về những thao tác bạn đã tự làm sau đó. Một bước khử trùng lặp hoàn toàn đúng đắn ở lần chạy trước sẽ làm số dòng của bạn ít hơn số họ khai, và phép đối soát hôm nay sẽ không khớp vì một lý do chẳng liên quan gì tới lần chạy hôm nay.",
+    "formulaOrSyntax": "-- Trước khi đi tìm nguyên nhân ở bên ngoài, hãy tự hỏi:\n--   mình đã xoá, gộp hay sửa gì trên phần dữ liệu này chưa?\n--   nếu có, bản kê khai bên ngoài có biết chuyện đó không?\n\n-- Nếu tiền đề đã bị chính mình làm lệch, hãy dựng lại phần dữ liệu đó\n-- từ nguồn thô cho sạch, và dời bản cũ sang thư mục rác thay vì xoá hẳn.",
+    "pitfall": "Không có gì báo cho bạn biết sai lệch đến từ chính mình. Bạn sẽ ngồi truy một chênh lệch vài trăm dòng và mặc định rằng hoặc nguồn có vấn đề, hoặc pipeline hôm nay có vấn đề. Vì vậy hãy biến việc rà lại lịch sử thao tác của chính mình thành bước đầu tiên chứ không phải bước cuối cùng. Nói rộng hơn thì một kết quả hoàn toàn đúng ở bài trước vẫn có thể là tiền đề sai cho bài sau.",
+    "sourceLink": {
+      "text": "dbt-audit-helper — so sánh hai phiên bản của cùng một bảng",
+      "url": "https://github.com/dbt-labs/dbt-audit-helper"
+    }
+  },
 ]

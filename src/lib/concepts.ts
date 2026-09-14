@@ -707,5 +707,109 @@ export const DEFAULT_CONCEPTS: ConceptItem[] = [
       "text": "SQLMesh — Plans & restatement (phân biệt lookback với restate)",
       "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/plans/"
     }
-  }
+  },
+  {
+    "id": "c_torn_read_window",
+    "subject": "Reliability & Ops",
+    "term": "54. Torn read — đọc trúng lúc dữ liệu đang được ghi lại",
+    "pronounceOrType": "Chế độ hỏng khi cập nhật dữ liệu đang phục vụ",
+    "definition": "Khi bạn cập nhật một phần dữ liệu bằng cách xoá bản cũ rồi ghi bản mới, thao tác đó thực ra gồm hai bước tách rời nhau. Trong quãng thời gian giữa hai bước, ai lỡ đọc vào sẽ nhận được một kết quả sai: có thể thiếu dòng, có thể trùng dòng, cũng có thể là lỗi không mở được file vì file vừa biến mất. Người ta gọi lần đọc rơi trúng trạng thái dở dang đó là torn read. Điều đáng ngại là nó không báo gì cho người đọc, mà trả về một con số trông hoàn toàn bình thường.",
+    "formulaOrSyntax": "-- Cách cập nhật tại chỗ, và quãng thời gian nguy hiểm của nó:\nDELETE FROM <partition>;        -- bước 1\nCOPY (...) TO '<partition>';    -- bước 2\n-- quãng giữa hai bước chính là cửa sổ torn read\n\n-- Độ dài quãng đó bằng thời gian GHI dữ liệu, nên nó lớn dần theo khối lượng.\n-- Số đo khi ghi lại một ngày dữ liệu đơn hàng:\n--   180 nghìn dòng : mất 1,9 giây\n--   3,6 triệu dòng : mất 28,7 giây",
+    "pitfall": "Đừng đánh giá một cách cập nhật bằng việc job có chạy xong hay không, mà bằng việc người đọc nhìn thấy gì trong lúc nó chạy. Một job kết thúc bình thường nhưng làm dashboard hiện ra số 0 thì vẫn là một lần hỏng. Trong ba thứ người đọc có thể gặp, lỗi mở file lại là thứ ít nguy hiểm nhất, vì nó làm job báo đỏ và có người vào sửa; còn một kết quả bằng 0 thì đi thẳng vào báo cáo mà không ai nghi ngờ gì.",
+    "sourceLink": {
+      "text": "Delta Lake protocol — tính atomic của một lần commit",
+      "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
+    }
+  },
+  {
+    "id": "c_publish_by_rename",
+    "subject": "Reliability & Ops",
+    "term": "55. Publish bằng rename — dựng ở chỗ khuất rồi đổi tên vào chỗ",
+    "pronounceOrType": "Khuôn công bố dữ liệu mới",
+    "definition": "Nguyên tắc là đừng sửa thứ mà người đọc đang nhìn vào. Bạn dựng phiên bản mới ở một thư mục riêng mà người đọc không quét tới, xong xuôi rồi mới đổi tên thư mục đó vào đúng vị trí. Sở dĩ cách này ăn thua là vì lệnh rename không chuyển đi byte dữ liệu nào; hệ điều hành chỉ sửa lại mục ghi tên trong bảng thư mục, nên thư mục lớn tới đâu thì lệnh đó cũng chỉ mất chừng ấy thời gian.",
+    "formulaOrSyntax": "-- Phần chậm diễn ra ở chỗ không ai thấy:\ndựng bản mới  ->  lake/.staging/<partition>\n\n-- Phần công bố gồm hai lệnh đổi tên:\nlệnh 1: lake/orders/<partition>    ->  lake/.trash/<partition>.<timestamp>\nlệnh 2: lake/.staging/<partition>  ->  lake/orders/<partition>\n\n-- Số đo trên cùng một ngày dữ liệu: dựng lại mất 1,3 giây,\n-- còn phần công bố mất khoảng 4 phần nghìn giây.",
+    "pitfall": "Thay một thư mục đang phục vụ thì cần tới hai lệnh đổi tên, nên cách này chỉ gần như tức thì chứ chưa phải atomic. Giữa hai lệnh đó, thư mục dữ liệu không tồn tại. Có thể kiểm chứng bằng cách cố tình chèn một khoảng nghỉ hai giây vào giữa: người đọc sẽ nhận số 0 trong đúng hai giây ấy. Nếu bạn gọi cách này là atomic thì lần crash đầu tiên sẽ đính chính lại. Còn một điều kiện nữa: thư mục staging và thư mục rác phải nằm cùng ổ đĩa với dữ liệu, vì khác ổ thì hệ điều hành lặng lẽ biến lệnh đổi tên thành chép rồi xoá, mất hàng chục giây và không còn tức thì nữa.",
+    "sourceLink": {
+      "text": "Apache Iceberg — cơ chế snapshot",
+      "url": "https://iceberg.apache.org/spec/#snapshots"
+    }
+  },
+  {
+    "id": "c_staging_outside_glob",
+    "subject": "Storage & Pruning",
+    "term": "56. Thư mục tạm phải nằm ngoài phạm vi quét của người đọc",
+    "pronounceOrType": "Cách bố trí thư mục trong data lake",
+    "definition": "Khi người đọc lấy dữ liệu bằng một mẫu đường dẫn, chẳng hạn quét mọi file parquet nằm trong orders, thì bất kỳ thư mục nào bạn tạo thêm bên trong orders cũng bị gộp vào kết quả. Vì vậy thư mục tạm phải đặt ngang hàng với thư mục dữ liệu, chứ không đặt bên trong nó.",
+    "formulaOrSyntax": "-- Bố trí đúng: thư mục tạm là anh em, không phải con\nlake/\n  orders/     <- người đọc quét theo mẫu 'orders/*/*.parquet'\n  .staging/   <- nằm ngoài mẫu đó\n  .trash/     <- nằm ngoài mẫu đó\n\n-- Bố trí sai: bản sao tạm nằm ngay trong orders/\nlake/orders/order_date=2026-06-19\nlake/orders/order_date=2026-06-19.__tmp__   <- vẫn bị quét vào,\n                                            -- số dòng đọc ra gấp đôi thực tế",
+    "pitfall": "Chỗ này hỏng vì hai lẽ cộng lại, và cả hai đều im lặng. Thứ nhất, dấu sao trong mẫu đường dẫn không kiểm tra tên thư mục, nên bản sao tạm bị vơ vào. Thứ hai, khi lọc theo ngày thì DuckDB đọc chuỗi 2026-06-19 ở đầu tên thư mục rồi dừng, phần đuôi phía sau bị bỏ qua, nên bản sao tạm vẫn khớp điều kiện lọc như thường. Kết quả là dữ liệu bị đếm hai lần, trong khi không có tiến trình nào đang ghi và không có lỗi nào được báo. Đổi tên thư mục tạm thành dạng có dấu chấm ở đầu cũng không cứu được, vì dấu chấm đầu tên chỉ giấu thư mục khỏi lệnh liệt kê trên Linux, còn mẫu đường dẫn thì vẫn khớp.",
+    "sourceLink": {
+      "text": "DuckDB — Hive partitioning",
+      "url": "https://duckdb.org/docs/stable/data/partitioning/hive_partitioning"
+    }
+  },
+  {
+    "id": "c_retry_on_read",
+    "subject": "Reliability & Ops",
+    "term": "57. Retry-on-read — coi kết quả rỗng là tín hiệu đọc lại",
+    "pronounceOrType": "Phòng thủ ở phía người đọc",
+    "definition": "Nếu bạn biết chắc phần dữ liệu mình hỏi tới vốn dĩ có số liệu, thì một kết quả rỗng hoặc một lỗi không mở được file nhiều khả năng nghĩa là dữ liệu đang được thay giữa chừng. Trong trường hợp đó, phía đọc nên chờ một nhịp rồi hỏi lại, thay vì trả ngay số 0 cho người dùng. Cách làm phổ biến là thử lại vài lần, mỗi lần cách nhau một khoảng ngắn.",
+    "formulaOrSyntax": "def read_with_retry(attempts=15, wait=0.3):\n    for _ in range(attempts):\n        try:\n            n = read_once()\n            if n > 0:\n                return n          # có số liệu thì trả về luôn\n        except IOError:\n            pass                  # file biến mất giữa lúc quét\n        time.sleep(wait)          # chờ một nhịp rồi hỏi lại\n    raise RuntimeError('dữ liệu vẫn rỗng sau khi đã thử lại')",
+    "pitfall": "Cách này chỉ dùng được khi bạn biết trước dữ liệu phải có; với một ngày thật sự không phát sinh đơn hàng nào thì số 0 là câu trả lời đúng, và việc thử lại chỉ làm chậm. Quan trọng hơn, phía đọc và phía ghi phải cùng làm phần của mình. Nếu phía ghi vẫn cập nhật tại chỗ và mất gần nửa phút, thì vòng thử lại kéo dài vài giây sẽ hết lượt trước khi dữ liệu kịp xuất hiện, và vẫn trả về số 0. Ngược lại, nếu phía ghi đã rút quãng nguy hiểm xuống vài phần nghìn giây mà phía đọc không thử lại, thì xác suất trúng tuy nhỏ vẫn cộng dồn theo số lần đọc và số lần cập nhật mỗi ngày, và khi trúng thì người đọc không có cách nào biết mình đang cầm số sai.",
+    "sourceLink": {
+      "text": "Google SRE Book — retry và xử lý quá tải",
+      "url": "https://sre.google/sre-book/handling-overload/"
+    }
+  },
+  {
+    "id": "c_crash_safe_invariant",
+    "subject": "Reliability & Ops",
+    "term": "58. An toàn khi crash đến từ việc luôn còn một bản đầy đủ",
+    "pronounceOrType": "Tính chất bất biến của thao tác công bố dữ liệu",
+    "definition": "Một thao tác không trở nên an toàn chỉ vì nó chạy nhanh hơn. Cái làm nó an toàn là ở mọi thời điểm, kể cả lúc tiến trình bị giết đột ngột, vẫn luôn có ít nhất một nơi đang giữ một bản dữ liệu đầy đủ. Giữ được tính chất đó thì mới viết được một hàm khôi phục đáng tin, vì hàm đó chỉ cần đi tìm xem bản đầy đủ hiện đang nằm ở đâu.",
+    "formulaOrSyntax": "-- Nếu tiến trình chết ngay sau lệnh đổi tên thứ nhất:\nthư mục dữ liệu chính  ->  không tồn tại\nthư mục staging        ->  bản MỚI, đầy đủ\nthư mục rác            ->  bản CŨ, đầy đủ\n\n-- Hàm khôi phục xét theo thứ tự:\n1. dữ liệu chính đã có chưa\n2. staging còn không     -> đưa vào, vì đây là bản mới hơn\n3. thư mục rác còn không -> đưa lại bản cũ",
+    "pitfall": "Cần nói rõ một điều: sau khi crash thì dữ liệu biến mất và nó không tự trở lại, phải có người chạy khôi phục. Khi diễn tập chuyện này, hãy giết tiến trình theo cách không cho nó dọn dẹp gì cả, vì chỉ như vậy mới giống một lần mất điện thật; thoát chương trình theo cách thông thường thì các đoạn dọn dẹp vẫn chạy và bạn không thấy được tình huống xấu nhất. Riêng trên Windows còn một chuyện nữa: lệnh đổi tên sẽ báo lỗi thiếu quyền nếu có bất kỳ tiến trình nào đang mở file bên trong thư mục, kể cả một người đọc đang quét dở hay phần mềm quét virus, nên phía ghi cần một vòng thử lại ngắn. Không có vòng đó thì lỗi đầu tiên sẽ giết script đúng vào lúc tệ nhất, là khi bản cũ đã bị dời đi mà bản mới chưa được đưa vào.",
+    "sourceLink": {
+      "text": "Python — os.replace và os._exit",
+      "url": "https://docs.python.org/3/library/os.html#os.replace"
+    }
+  },
+  {
+    "id": "c_catalog_swap",
+    "subject": "SQL & Engine",
+    "term": "59. Đổi tên bảng trong một transaction",
+    "pronounceOrType": "Cách công bố dữ liệu ở tầng warehouse",
+    "definition": "Bên trong một database thì không cần tới mấy mẹo đổi tên thư mục, vì database có sẵn một cuốn sổ ghi tên nào đang trỏ tới dữ liệu nào, gọi là catalog. Bạn dựng bảng thay thế dưới một tên tạm, rồi đổi tên hai bảng cho nhau trong cùng một transaction. Vì cuốn sổ đó nằm trong transaction nên hai lần đổi tên hoặc cùng hiện ra, hoặc cùng không hiện ra, và người đọc không bao giờ rơi vào khoảng giữa.",
+    "formulaOrSyntax": "BEGIN;\n  ALTER TABLE orders     RENAME TO orders_old;\n  ALTER TABLE orders_new RENAME TO orders;\nCOMMIT;\n\n-- Một phiên khác đếm số dòng trong lúc transaction đang chạy:\n--   trước COMMIT : thấy bảng CŨ, đầy đủ và đúng\n--   sau  COMMIT  : thấy bảng mới\n-- Không có thời điểm nào nó thấy bảng rỗng hay thấy nửa nọ nửa kia.",
+    "pitfall": "Cách này có hai giới hạn cần nói ra thay vì để người dùng tự phát hiện. Thứ nhất, nó chỉ bảo vệ những phiên đang kết nối vào chính database đó; một tiến trình khác thậm chí còn không mở nổi file database khi tiến trình ghi đang giữ, vì phần lớn database nhúng chỉ cho một người ghi tại một thời điểm. Thứ hai, nó không giúp được gì cho những ai đọc thẳng file parquet ngoài lake, bởi những file đó nằm ngoài catalog. Đây cũng là lý do bên lake phải chấp nhận một khoảng hở còn bên database thì không: hệ thống file không có cuốn sổ nào bao trùm được hai lệnh đổi tên thư mục.",
+    "sourceLink": {
+      "text": "DuckDB — ALTER TABLE và RENAME",
+      "url": "https://duckdb.org/docs/stable/sql/statements/alter_table"
+    }
+  },
+  {
+    "id": "c_versioned_dir_view",
+    "subject": "Storage & Pruning",
+    "term": "60. Thư mục có đánh version và view trỏ sang bản mới",
+    "pronounceOrType": "Cách công bố dữ liệu ở tầng lake",
+    "definition": "Ý tưởng là không bao giờ sửa một thư mục đã công bố. Mỗi lần cần ghi lại, bạn tạo hẳn một thư mục version mới, dựng dữ liệu trong đó cho xong, rồi tạo lại view để nó trỏ sang thư mục mới. Người dùng luôn truy vấn qua tên view chứ không bao giờ gõ thẳng đường dẫn thư mục. Nhờ vậy việc chuyển sang bản mới chỉ là sửa một dòng trong catalog; muốn quay lui thì trỏ view về thư mục cũ là xong, không phải khôi phục dữ liệu từ đâu cả. Đọc lại thư mục cũ cũng chính là cách trả lời câu hỏi hôm qua dữ liệu trông thế nào.",
+    "formulaOrSyntax": "lake/orders_v=<version cũ>/    <- view đang trỏ vào đây, người đọc vẫn dùng bình thường\nlake/orders_v=<version mới>/  <- dựng lại ở đây, chưa ai đọc nên sửa thoải mái\n\nCREATE OR REPLACE VIEW core.lake_orders AS\nSELECT * EXCLUDE (orders_v)\nFROM read_parquet('lake/orders_v=<version mới>/*/*.parquet',\n                  hive_partitioning=true);",
+    "pitfall": "Cái phải trả là dung lượng đĩa. Nếu bạn tạo version mới bằng cách chép cả cây thư mục thì toàn bộ lake bị nhân đôi, trong khi thường chỉ một phần rất nhỏ thực sự thay đổi. Trên tập dữ liệu nhỏ, thao tác chép còn nhanh hơn cả việc dựng lại nên chi phí này không lộ ra; tới khi dữ liệu lớn gấp vài chục lần thì mỗi lần chép mất hàng chục giây, vẫn chỉ để thay đúng một phần nhỏ. Iceberg và Delta Lake giữ nguyên ý tưởng con trỏ version nhưng ghi danh sách từng file vào metadata, nhờ đó version sau dùng lại được mọi file không đổi và chỉ phần thật sự ghi lại mới chiếm thêm chỗ.",
+    "sourceLink": {
+      "text": "Apache Iceberg — cơ chế snapshot",
+      "url": "https://iceberg.apache.org/spec/#snapshots"
+    }
+  },
+  {
+    "id": "c_version_retention",
+    "subject": "Reliability & Ops",
+    "term": "61. Giữ lại bao nhiêu bản cũ — chính sách retention",
+    "pronounceOrType": "Việc vận hành phải chạy định kỳ",
+    "definition": "Mọi cách công bố dữ liệu an toàn đều dựa trên việc giữ lại bản cũ thêm một thời gian, vì đó là thứ cho phép quay lui. Nhưng giữ lại thì tốn chỗ, và mỗi lần ghi lại một phần dữ liệu là thêm một bản đầy đủ nữa nằm trên đĩa. Vì vậy phải có một chính sách nói rõ giữ bao nhiêu và giữ bao lâu, chẳng hạn giữ N bản gần nhất, hoặc xoá những bản cũ hơn X ngày.",
+    "formulaOrSyntax": "-- Cùng một câu hỏi, đặt ra ở hai chỗ:\nlake/.trash/<partition>.<timestamp>   -> giữ mấy thế hệ?\nlake/orders_v=<version>/              -> giữ mấy version?\n\n-- Chính sách thường gặp:\n--   giữ N bản gần nhất, xoá phần còn lại\n--   hoặc xoá mọi bản cũ hơn X ngày",
+    "pitfall": "Đừng xoá bản cũ ngay tại thời điểm công bố bản mới, vì làm vậy là tự cắt mất đường quay lui đúng lúc rủi ro cao nhất. Nhưng cũng đừng để đó rồi quên, vì thư mục rác chỉ lớn dần chứ không tự co lại. Chi phí đĩa cho việc giữ vài bản cũ vẫn nhỏ hơn nhiều so với việc dựng lại dữ liệu từ đầu lúc hai giờ sáng. Iceberg gọi việc dọn này là expire snapshots, và cần nhớ rằng đó là công việc bạn phải chủ động lên lịch, không có gì tự chạy hộ.",
+    "sourceLink": {
+      "text": "Apache Iceberg — expire snapshots và bảo trì bảng",
+      "url": "https://iceberg.apache.org/docs/latest/maintenance/"
+    }
+  },
 ]

@@ -11,6 +11,7 @@ import { a07 } from './a07'
 import { a08 } from './a08'
 import { a09 } from './a09'
 import { a10 } from './a10'
+import { a11 } from './a11'
 
 /**
  * MỞ MỘT BÀI MỚI:
@@ -40,9 +41,7 @@ export const assignments: AssignmentSpec[] = [
   a08,
   a09,
   a10,
-  locked('A11', 'Backfill', 'Nạp bù quá khứ',
-    'Re-run old days after discovering corrupted data.',
-    'Chạy lại các ngày cũ khi phát hiện dữ liệu hỏng.'),
+  a11,
   locked('A12', 'Parallelization', 'Xử lý song song',
     'Many processes running, one writer.',
     'Nhiều tiến trình cùng chạy, nhưng chỉ một nơi được ghi.'),

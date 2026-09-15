@@ -279,654 +279,203 @@ export const DEFAULT_CONCEPTS: ConceptItem[] = [
       "url": "https://duckdb.org/docs/sql/functions/nested"
     }
   },
+  /* ─────────── BẪY ĐỌC DỮ LIỆU & LOGIC XỬ LÝ ─────────── */
+  {
+    "id": "c_positional_mapping",
+    "subject": "Storage & Pruning",
+    "term": "21. Cạm bẫy đọc theo vị trí (Positional Mapping Trap)",
+    "pronounceOrType": "Lỗi hỏng trong im lặng khi nguồn đổi cấu trúc",
+    "definition": "Khi đọc file CSV, ta thường khai báo một bộ khung chuẩn (Explicit Schema) để công cụ khỏi đoán sai kiểu. Nhưng công cụ (engine) thường ghép cột theo VỊ TRÍ 1-2-3, ngó lơ hoàn toàn tên cột trên dòng đầu tiên (header). Nếu hôm nay nhà cung cấp tự ý đảo thứ tự cột trong file, dữ liệu sẽ chạy thẳng vào sai cột.",
+    "formulaOrSyntax": "-- Cấu hình khai báo: Cột 2 là JSON Items, Cột 3 là Tiền tệ (đều là kiểu chuỗi)\nread_csv(..., columns={'id':'INT', 'items':'VARCHAR', 'currency':'VARCHAR'})",
+    "pitfall": "Nhà cung cấp đảo cột tiền tệ lên vị trí số 2. Chuỗi 'USD' chui tọt vào cột 'items'. Vì cả hai đều là văn bản, chương trình chạy mượt mà không văng lỗi (Silent failure). Lỗi làm sập script hóa ra lại dễ chịu hơn vì có còi báo để ta sửa ngay[cite: 8, 12].",
+    "sourceLink": { "text": "DuckDB read_csv columns", "url": "https://duckdb.org/docs/stable/data/csv/overview" }
+  },
   {
     "id": "c_fanout_trap",
     "subject": "Complex Types",
-    "term": "21. Fan-Out Join Trap",
-    "pronounceOrType": "Cạm bẫy nhân trùng doanh thu",
-    "definition": "Khi bảng con có N dòng cho 1 đơn hàng, tuyệt đối không JOIN ngược về bảng cha rồi SUM(order_total) vì doanh thu sẽ bị nhân lên N lần.",
-    "formulaOrSyntax": "-- ĐÚNG: Tính tổng từ bảng con\nSELECT round(sum(qty * unit_price), 2) AS total_sales FROM core.order_items;\n\n-- SAI (Fan-out nhân doanh thu N lần):\nSELECT sum(o.order_total) FROM core.order_items i JOIN staging.orders o USING(order_id);",
-    "pitfall": "Báo cáo sai lệch doanh thu hàng chục tỷ cho ban giám đốc do lỗi nhân trùng từ phép JOIN làm mịn dữ liệu.",
-    "sourceLink": {
-      "text": "DuckDB Aggregates",
-      "url": "https://duckdb.org/docs/sql/functions/aggregate"
-    }
+    "term": "22. Cạm bẫy Fan-Out (Nhân trùng doanh thu)",
+    "pronounceOrType": "Nguyên lý bảo toàn độ mịn dữ liệu",
+    "definition": "Độ mịn (grain) quyết định 1 dòng của bảng đại diện cho cái gì. Khi bạn bung một đơn hàng thành 3 mặt hàng chi tiết, 1 dòng cha đẻ ra 3 dòng con. Nếu bạn tùy tiện nối (JOIN) bảng con này ngược lại bảng cha, rồi cộng tổng tiền từ cột của bảng cha, con số sẽ bị nhân lên 3 lần.",
+    "formulaOrSyntax": "-- CÁCH ĐÚNG: Tính tổng từ đúng độ mịn của con\nSELECT sum(qty * unit_price) FROM core.order_items;\n-- CÁCH SAI: Kéo cột tổng của cha xuống dòng con rồi SUM\nSELECT sum(o.order_total) FROM order_items i JOIN orders o ...;",
+    "pitfall": "Báo cáo doanh thu tăng vọt hàng chục tỷ nhưng pipeline vẫn báo xanh, không có bất kỳ thông báo lỗi nào văng ra. Đổi độ mịn có chủ đích là mô hình hóa; đổi do sơ ý là phá nát số liệu[cite: 14].",
+    "sourceLink": { "text": "DuckDB Aggregates", "url": "https://duckdb.org/docs/sql/functions/aggregate" }
   },
   {
-    "id": "c_json_null_tristate",
-    "subject": "Complex Types",
-    "term": "22. JSON Empty Tri-State",
-    "pronounceOrType": "Ba sắc thái rỗng trong JSON",
-    "definition": "JSON có 3 kiểu rỗng: key mang null literal, key vắng mặt, và chuỗi sentinel 'none'. Phải kết hợp ->> với NULLIF để gấp về 1 giá trị SQL NULL duy nhất.",
-    "formulaOrSyntax": "NULLIF(CAST(meta AS JSON)->>'utm', 'none') AS clean_utm",
-    "pitfall": "Dùng -> trả về JSON string (chứa cả ngoặc kép hoặc chữ 'null'), phải dùng ->> mới trả về SQL VARCHAR/NULL thực sự.",
-    "sourceLink": {
-      "text": "DuckDB JSON Types",
-      "url": "https://duckdb.org/docs/sql/data_types/json"
-    }
-  },
-  {
-    "id": "c_lifecycle_sequence",
-    "subject": "Quality Gate",
-    "term": "23. Quality Gate 6-Step Sequence",
-    "pronounceOrType": "Quy trình thực thi bất biến",
-    "definition": "Thứ tự bắt buộc trong 1 batch nạp: Khởi tạo Staging -> Gắn cờ lỗi (Flagging) -> Báo cáo kiểm định (Log report) -> Xuất cách ly (Quarantine) -> Đánh giá Gate -> Nạp Core.",
-    "formulaOrSyntax": "1. Stage   ➔ Nạp CSV thô sang typed staging\n2. Flag    ➔ LEFT JOIN kiểm tra luật, gắn reject_reason\n3. Report  ➔ Ghi nhận 16 checks vào ops.dq_report\n4. Quaran. ➔ Xuất dữ liệu lỗi ra Parquet partition\n5. Gate    ➔ So sánh % lỗi với Contract Tolerance (Hard Fail nếu vượt)\n6. Load    ➔ Nạp dữ liệu sạch vào core.orders",
-    "pitfall": "Đặt Gate sau bước nạp Core (load_good): dữ liệu lỗi đã lọt vào kho nghiệp vụ trước khi phát hiện vi phạm.",
-    "sourceLink": {
-      "text": "Data Contracts Quality Gate",
-      "url": "https://datacontracts.com/"
-    }
-  },
-  {
-    "id": "c_split_load",
-    "subject": "Quality Gate",
-    "term": "24. Split Load & Quarantine Pattern",
-    "pronounceOrType": "Cơ chế tách luồng kiểm dịch",
-    "definition": "Tách dòng sạch nạp vào Core, đẩy dòng bẩn ra vùng kiểm dịch (Quarantine Parquet) lưu đầy đủ lý do, thời điểm và 2 cột lineage để kiểm toán hoặc nạp bù.",
-    "formulaOrSyntax": "-- 1. Quarantine (Ghi nhận bằng chứng lỗi):\nCOPY (SELECT *, now() AT TIME ZONE 'UTC' AS _rejected_at FROM flagged WHERE reject_reason IS NOT NULL)\nTO 'quarantine/orders' (FORMAT PARQUET, PARTITION_BY(order_date), FILENAME_PATTERN 'from_{DAY}_{i}');\n\n-- 2. Core (Nạp dòng sạch khi Gate PASS):\nINSERT INTO core.orders SELECT * EXCLUDE(reject_reason) FROM flagged WHERE reject_reason IS NULL;",
-    "pitfall": "Xóa bỏ âm thầm các bản ghi lỗi: làm mất bằng chứng đối soát với nhà cung cấp và mất khả năng replay dữ liệu sau khi sửa lỗi.",
-    "sourceLink": {
-      "text": "DuckDB Parquet Copy",
-      "url": "https://duckdb.org/docs/sql/statements/copy"
-    }
-  },
-  {
-    "id": "c_zero_counts",
-    "subject": "Quality Gate",
-    "term": "25. Zero-Fail Value in Audit Logging",
-    "pronounceOrType": "Giá trị kiểm toán của số 0",
-    "definition": "Ghi nhận đầy đủ mọi check vào ops.dq_report kể cả khi số dòng lỗi bằng 0. Số 0 là bằng chứng chứng minh check ĐÃ CHẠY và dữ liệu ĐẠT chuẩn.",
-    "formulaOrSyntax": "SELECT current_timestamp, DATE '{DAY}', 'row', check_name, rows_checked,\n       coalesce(rows_failed, 0) AS rows_failed, ...\nFROM all_checks LEFT JOIN observed USING(check_name);",
-    "pitfall": "Chỉ ghi log các check bị lỗi: không thể phân biệt giữa 'check đạt 0 lỗi' với 'check bị quên chưa chạy'.",
-    "sourceLink": {
-      "text": "DuckDB INSERT Statement",
-      "url": "https://duckdb.org/docs/sql/statements/insert"
-    }
-  },
-  {
-    "id": "c_data_observability_5",
-    "subject": "Quality Gate",
-    "term": "26. 5 Pillars of Data Observability",
-    "pronounceOrType": "Năm trụ cột quan sát chất lượng dữ liệu",
-    "definition": "Khung tiêu chuẩn giám sát toàn diện: 1. Freshness (Độ tươi), 2. Quality (Chất lượng nội dung), 3. Volume (Khối lượng số dòng), 4. Schema (Hình dạng lược đồ), 5. Lineage (Nguồn gốc truy vết).",
-    "formulaOrSyntax": "1. Freshness ➔ max(_data_date) có trễ SLA không?\n2. Quality   ➔ Tỷ lệ rác có vượt Tolerance Contract?\n3. Volume    ➔ Count staged có khớp Manifest producer khai?\n4. Schema    ➔ Cột bẩn có phá vỡ Explicit Schema?\n5. Lineage   ➔ _data_date, _run_id có truy vết được run nào không?",
-    "pitfall": "Chỉ theo dõi pipeline chạy thành công (exit 0) mà bỏ qua 5 trụ cột: job xanh nhưng thực tế nạp 0 dòng hoặc nạp dữ liệu cũ 3 ngày trước.",
-    "sourceLink": {
-      "text": "DuckDB Documentation",
-      "url": "https://duckdb.org/docs/"
-    }
-  },
-  {
-    "id": "c_null_three_valued",
+    "id": "c_three_valued_null",
     "subject": "SQL Fundamentals",
-    "term": "27. Three-Valued Logic (NULL semantics)",
-    "pronounceOrType": "Logic ba trị: TRUE / FALSE / UNKNOWN",
-    "definition": "SQL không dùng logic hai trị như Python. Mọi phép so sánh với NULL trả về UNKNOWN, và WHERE chỉ giữ dòng khi điều kiện là TRUE — UNKNOWN bị loại y hệt FALSE. Đây là nguồn gốc của phần lớn lỗi đếm sai trong data engineering, và nó đúng ở mọi engine SQL.",
-    "formulaOrSyntax": "NULL = NULL              ➔ UNKNOWN  (không phải TRUE!)\nNULL <> 'a'              ➔ UNKNOWN  (không phải TRUE!)\nstatus NOT IN ('a','b')  ➔ UNKNOWN khi status IS NULL\n\n-- Cách đúng:\nWHERE status IS NULL OR status NOT IN ('a','b')\nWHERE col IS DISTINCT FROM other    -- so sánh coi NULL = NULL\n\n-- count() cũng phân biệt:\ncount(*)    ➔ đếm mọi dòng\ncount(col)  ➔ BỎ QUA dòng có col IS NULL",
-    "pitfall": "Viết WHERE status NOT IN (...) để bắt giá trị rác: dòng có status NULL trả về UNKNOWN nên LỌT QUA bộ lọc. Rác đi thẳng vào core trong khi check báo 0 lỗi.",
-    "sourceLink": {
-      "text": "DuckDB — NULL values",
-      "url": "https://duckdb.org/docs/sql/data_types/nulls"
-    }
+    "term": "23. Bẫy logic 3 trị & Bỏ lọt rác với NULL",
+    "pronounceOrType": "Bản chất hàm điều kiện trong SQL",
+    "definition": "Không giống Python chỉ có True/False, SQL có trạng thái thứ 3 là UNKNOWN (Không biết). Bất cứ phép so sánh nào với NULL (kể cả `NULL <> 'a'`) đều trả về UNKNOWN. Khi nằm trong mệnh đề WHERE, UNKNOWN bị gạt đi y hệt như FALSE. Điều này làm lủng mọi bộ lọc chặn rác nếu không viết kỹ.",
+    "formulaOrSyntax": "-- Khi cột status mang giá trị NULL, phép thử này trả về UNKNOWN:\nWHERE status NOT IN ('paid', 'cancelled') \n-- Cách viết kín kẽ: Bắt riêng trường hợp NULL\nWHERE status IS NULL OR status NOT IN ('paid', 'cancelled')",
+    "pitfall": "Viết bộ lọc lỏng lẻo khiến các dòng rác (mang giá trị NULL) lặng lẽ lọt qua khe và chui thẳng vào kho dữ liệu. Kỹ sư tự tin khoe check báo 0 lỗi, nhưng kho chứa đầy rác[cite: 15].",
+    "sourceLink": { "text": "DuckDB — NULL values", "url": "https://duckdb.org/docs/sql/data_types/nulls" }
+  },
+
+  /* ─────────── KIỂM DỊCH & XỬ LÝ SỰ CỐ TẠI CỬA VÀO ─────────── */
+  {
+    "id": "c_split_load_evidence",
+    "subject": "Quality Gate",
+    "term": "24. Tách luồng kiểm dịch (Split Load) & Bằng chứng số 0",
+    "pronounceOrType": "Kiến trúc lưới lọc dữ liệu",
+    "definition": "Dữ liệu thực tế luôn có 1-2% là rác. Làm sập cả hệ thống nạp chỉ vì 1% rác là thiết kế tồi. Nguyên tắc: Dòng sạch nạp thẳng vào kho chính (Core), dòng bẩn đẩy ra một thư mục riêng (Quarantine) kèm lý do vì sao nó trượt. Lượng rác này chính là bằng chứng để đi đòi nhà cung cấp sửa lỗi.",
+    "formulaOrSyntax": "1. Dòng sạch ➔ Nạp kho: INSERT ... WHERE reject_reason IS NULL;\n2. Dòng bẩn ➔ Cách ly: COPY ... WHERE reject_reason IS NOT NULL;\n3. Kiểm toán ➔ Ghi nhận `rows_failed = 0` vào sổ.",
+    "pitfall": "Chỉ ghi log khi có lỗi văng ra. Về sau nhìn lại, bạn không thể phân biệt nổi một quy tắc \"chạy mượt mà ra 0 lỗi\" với một quy tắc \"bị sập hoặc lập trình viên bỏ quên chưa từng chạy\"[cite: 15].",
+    "sourceLink": { "text": "Data Contracts Quality Gate", "url": "https://datacontracts.com/" }
   },
   {
-    "id": "c_window_vs_groupby",
-    "subject": "SQL Fundamentals",
-    "term": "28. Window Function vs GROUP BY",
-    "pronounceOrType": "Gom nhóm mà KHÔNG làm sụp dòng",
-    "definition": "GROUP BY gộp N dòng thành 1. Window function tính trên nhóm nhưng GIỮ NGUYÊN N dòng, thêm kết quả thành một cột. Đây là công cụ cho: chọn bản mới nhất mỗi khoá, xếp hạng, running total, và so một dòng với trung bình nhóm của chính nó.",
-    "formulaOrSyntax": "-- Chọn bản mới nhất mỗi khoá (latest-wins dedupe):\nSELECT * EXCLUDE (rn) FROM (\n  SELECT *, row_number() OVER (\n    PARTITION BY order_id ORDER BY updated_at DESC) AS rn\n  FROM staging.orders\n) WHERE rn = 1;\n\n-- So một dòng với trung bình nhóm của nó (GROUP BY không làm được):\nSELECT store_id, order_total,\n       avg(order_total) OVER (PARTITION BY store_id) AS store_avg\nFROM orders;\n\n-- Running total theo thời gian:\nsum(total) OVER (ORDER BY order_ts ROWS UNBOUNDED PRECEDING)\n\n-- Khi có giá trị bằng nhau, ba hàm cho ba kết quả khác nhau:\nrow_number ➔ 1,2,3,4    rank ➔ 1,2,2,4    dense_rank ➔ 1,2,2,3",
-    "pitfall": "Dùng GROUP BY + max(updated_at) để dedupe: bạn lấy được thời điểm mới nhất, nhưng các cột KHÁC lại lấy từ dòng bất kỳ trong nhóm — dữ liệu bị trộn giữa hai phiên bản.",
-    "sourceLink": {
-      "text": "DuckDB — Window functions",
-      "url": "https://duckdb.org/docs/sql/functions/window_functions"
-    }
+    "id": "c_symptom_vs_rootcause",
+    "subject": "Reliability & Ops",
+    "term": "25. Triệu chứng (Symptom) vs. Căn nguyên (Root Cause)",
+    "pronounceOrType": "Đừng tin lời thông báo lỗi của công cụ",
+    "definition": "Khi hệ thống sập, thông báo lỗi chỉ cho bạn biết 'chỗ chương trình đầu hàng', chứ không trỏ đúng 'chỗ dữ liệu bị hỏng'. Ví dụ: Công cụ báo 'không dò được dấu phân cách' (Triệu chứng) thực ra là do bộ quét đọc trúng 1 dấu nháy kép không có dấu đóng. Tại sao lại thiếu dấu đóng? Vì hệ thống nguồn xuất file bị ngắt đứt đoạn 150 dòng giữa chừng (Căn nguyên).",
+    "formulaOrSyntax": "Lỗi ồn ào văng ra ➔ Đọc thông báo ➔ ĐỪNG sửa code vội ➔ Soi dung lượng file và dòng header vật lý ➔ Chốt nguyên nhân gốc.",
+    "pitfall": "Thấy báo lỗi phân cách, lập tức cắm mặt vào sửa code, ép cứng delimiter vào hàm đọc file. Code rườm rà thêm mà file vẫn chết, vì bản chất file đã đứt ruột từ hệ thống nguồn[cite: 7, 8].",
+    "sourceLink": { "text": "datacontract CLI Testing", "url": "https://cli.datacontract.com/" }
   },
   {
-    "id": "c_grain_declaration",
+    "id": "c_data_contract_gap_violation",
+    "subject": "Quality Gate",
+    "term": "26. Phân định rác: Gap vs. Violation",
+    "pronounceOrType": "Luật chơi của Giao ước Dữ liệu (Data Contracts)",
+    "definition": "Khi phát hiện dữ liệu bất thường, phải chiếu theo Hợp đồng: \n- Lỗi cấm rõ trong hợp đồng (Ví dụ: Tiền không được âm) ➔ Violation (Vi phạm). Cách ly, đếm số lượng và đem đi chất vấn đối tác.\n- Lỗi hợp đồng quên chưa nhắc tới (Ví dụ: Múi giờ là gì?) ➔ Gap (Khoảng trống). Tự vá trong code của mình, sau đó đề xuất nâng cấp hợp đồng.",
+    "formulaOrSyntax": "Có cấm trong Contract không?\n- CÓ ➔ Kiểm tra ngưỡng cho phép ➔ Vượt ngưỡng thì sập lô hàng (Hard-fail).\n- KHÔNG ➔ Ghi nhận là Gap ➔ Đề xuất sửa đổi Hợp đồng (Amendment).",
+    "pitfall": "Lôi một cái Gap (thứ chưa từng được cam kết) ra đổ lỗi cho nhà cung cấp. Bạn sẽ cạn kiệt uy tín khi cần giải quyết các sự cố phá vỡ cam kết thực sự[cite: 12].",
+    "sourceLink": { "text": "Data Contracts Architecture", "url": "https://datacontracts.com/" }
+  },
+
+  /* ─────────── MÔ HÌNH HÓA VÀ THÍCH ỨNG SCHEMA ─────────── */
+  {
+    "id": "c_canonical_aligner",
     "subject": "Data Modeling",
-    "term": "29. Grain Declaration & Uniqueness Proof",
-    "pronounceOrType": "Quyết định thiết kế ĐẦU TIÊN của mỗi bảng",
-    "definition": "Grain là câu trả lời cho \"MỘT DÒNG của bảng này là cái gì\", viết trong đúng một câu, trước cả việc chọn cột. Và grain không phải lời hứa suông: nó phải chứng minh được bằng một truy vấn kiểm tra tính duy nhất của khoá.",
-    "formulaOrSyntax": "-- Ghi grain thành comment ngay trên DDL:\n-- grain: one row = one order (latest version in this file)\nCREATE TABLE staging.orders AS ...\n\n-- grain: one row = one store per order_date\nCREATE TABLE core.daily_store_sales AS ...\n\n-- CHỨNG MINH grain: khoá phải duy nhất, kết quả PHẢI rỗng\nSELECT order_date, store_id, count(*)\nFROM core.daily_store_sales\nGROUP BY 1, 2 HAVING count(*) > 1;",
-    "pitfall": "Hai bảng tên gần giống nhưng khác grain (orders_raw = một PHIÊN BẢN đơn hàng; orders = một ĐƠN HÀNG). Nối chúng rồi cộng tiền là đếm trùng doanh thu mà không lỗi nào báo.",
-    "sourceLink": {
-      "text": "Kimball Group — Dimensional modeling techniques",
-      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"
-    }
+    "term": "27. Canonical Aligner (Dịch một lần ở cửa vào)",
+    "pronounceOrType": "Chiến lược gom lịch sử khi nguồn tự đổi hình dạng",
+    "definition": "Nhà cung cấp tự ý đổi cấu trúc file 3 lần trong năm (gọi là 3 eras). Thay vì bắt các bảng báo cáo phía sau phải gồng gánh logic kiểm tra (nếu là thời kỳ 1 thì lấy cột A, nếu thời kỳ 2 thì lấy cột B), hãy dựng một lớp dịch mỏng (Canonical Aligner) ngay tại cửa nạp. Nó nắn mọi phiên bản cũ/mới về chung một khuôn chuẩn duy nhất.",
+    "formulaOrSyntax": "File era v1 -+\nFile era v2 -+-> Lớp dịch riêng (thêm cột, đổi tên) -> Khuôn chuẩn duy nhất\nFile era v3 -+",
+    "pitfall": "Gom chung logic dịch Schema (thêm/bớt cột) vào cùng một hàm với logic Dọn dẹp giá trị (Cleansing). Bạn sẽ phải chép bộ luật dọn dẹp làm 3 bản cho 3 thời kỳ; quên cập nhật 1 bản là số liệu lệch nhau[cite: 8, 12].",
+    "sourceLink": { "text": "SQLMesh Model Kinds", "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/models/model_kinds/" }
   },
   {
-    "id": "c_scd_type2",
+    "id": "c_backfill_default",
     "subject": "Data Modeling",
-    "term": "30. Slowly Changing Dimension (Type 1 vs Type 2)",
-    "pronounceOrType": "Attribute thay đổi theo thời gian",
-    "definition": "Khách hàng chuyển từ VN sang US. Báo cáo doanh thu năm ngoái nên tính họ là VN hay US? Type 1 ghi đè (mất lịch sử, đơn giản). Type 2 thêm dòng mới kèm khoảng hiệu lực (giữ lịch sử, join phức tạp hơn). Đây là câu hỏi bạn sẽ gặp ở mọi dự án có dimension.",
-    "formulaOrSyntax": "-- Type 1: ghi đè, chỉ biết hiện tại\nUPDATE dim_customer SET country = 'US' WHERE customer_id = 42;\n\n-- Type 2: thêm dòng, giữ lịch sử\ncustomer_sk | customer_id | country | valid_from | valid_to   | is_current\n        101 |          42 | VN      | 2020-01-01 | 2026-03-15 | false\n        102 |          42 | US      | 2026-03-15 | 9999-12-31 | true\n\n-- Join theo THỜI ĐIỂM SỰ KIỆN, không phải theo hiện tại:\nJOIN dim_customer d ON f.customer_id = d.customer_id\n  AND f.order_ts >= d.valid_from\n  AND f.order_ts <  d.valid_to",
-    "pitfall": "Dùng Type 1 rồi ngạc nhiên vì báo cáo cũ tự đổi số mỗi lần chạy lại. Nếu nghiệp vụ cần \"doanh thu theo quốc gia TẠI THỜI ĐIỂM đặt hàng\" thì bắt buộc Type 2 — và không sửa ngược được sau khi đã mất lịch sử.",
-    "sourceLink": {
-      "text": "Kimball Group — Slowly changing dimensions",
-      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"
-    }
+    "term": "28. Luật điền dữ liệu cũ (Known vs. Unknown Default)",
+    "pronounceOrType": "Nguyên tắc vá lỗ hổng lịch sử",
+    "definition": "Khi dải dữ liệu cũ thiếu một cột mới được thêm vào, bạn điền gì? Luật chốt: Chỗ thiếu mà mình biết chắc sự thật lịch sử thì điền giá trị cứng (Ví dụ: Thời kỳ v1 chưa có chương trình giảm giá, chắc chắn điền `discount = 0`). Chỗ thiếu mà do lịch sử không ai đo đạc (Ví dụ: Không đo kênh bán hàng) thì mới được để NULL.",
+    "formulaOrSyntax": "-- Cột giảm giá thời v1 (biết chắc là chưa có):\ndiscount_amount = 0\n-- Cột UTM kênh bán (không ai đo):\nchannel = NULL",
+    "pitfall": "Lười biếng điền NULL cho mọi cột thiếu. Khi bảng tính chạy lệnh `doanh_thu = tổng - giảm_giá (NULL)`, toán hạng chứa NULL sẽ làm toàn bộ biểu thức hóa NULL, âm thầm gạt sạch doanh thu của nhiều năm lịch sử[cite: 8, 12].",
+    "sourceLink": { "text": "Delta Lake Schema Update", "url": "https://docs.delta.io/latest/delta-batch.html#automatic-schema-update" }
   },
   {
-    "id": "c_surrogate_key",
+    "id": "c_canonical_vs_natural_key",
     "subject": "Data Modeling",
-    "term": "31. Natural Key vs Surrogate Key",
-    "pronounceOrType": "Ai là người cấp khoá",
-    "definition": "Natural key do nguồn cấp (order_id từ hệ thống upstream) — miễn phí và có ý nghĩa, nhưng nằm NGOÀI tầm kiểm soát của bạn. Surrogate key do warehouse tự sinh — vô nghĩa với người dùng nhưng bạn làm chủ hoàn toàn. Với SCD Type 2, surrogate key trở thành bắt buộc.",
-    "formulaOrSyntax": "-- Natural key: nguồn cấp, có thể đổi format bất cứ lúc nào\norder_id BIGINT      -- upstream đổi sang 'ORD-000123' ➔ warehouse vỡ\n\n-- Surrogate key: warehouse tự sinh\nCREATE SEQUENCE seq_customer_sk;\ncustomer_sk BIGINT DEFAULT nextval('seq_customer_sk')\n\n-- Hash key: tất định, sinh lại được, không cần sequence\nmd5(source_system || '|' || CAST(natural_key AS VARCHAR)) AS row_key",
-    "pitfall": "Với SCD Type 2, natural key KHÔNG còn duy nhất — một customer_id có nhiều dòng lịch sử. Join bằng natural key sẽ fan-out và nhân doanh thu lên theo số lần khách hàng đó đổi thông tin.",
-    "sourceLink": {
-      "text": "Kimball Group — Dimensional modeling techniques",
-      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"
-    }
+    "term": "29. Quản trị Khóa: Canonical Key vs. Natural Key",
+    "pronounceOrType": "Phòng thủ rủi ro khi nguồn đổi định dạng Khóa",
+    "definition": "Khóa của nguồn cấp cho bạn gọi là Natural Key. Vì sao nó nằm ngoài tầm kiểm soát? Vì hôm nay nó là số `123`, ngày mai nhà cung cấp hứng lên thêm chữ thành `'ORD-123'` mà không hỏi bạn. Nếu đem khóa thô này đi nối (JOIN) với dữ liệu cũ, hệ thống sẽ gãy. Thay vì tự đúc Khóa nhân tạo (Surrogate Key bằng Hash) tốn tài nguyên, cách thực chiến nhất là giữ lại bản gốc để làm bằng chứng (Natural Key), đồng thời tự cắt gọt chữ để sinh ra một bản số nguyên sạch sẽ (Canonical Key) dùng riêng cho các bảng nội bộ của team Data.",
+    "formulaOrSyntax": "-- Giữ cả 2 định dạng trên cùng một dòng trong kho:\norder_id VARCHAR = 'ORD-0123'     -- Giữ nguyên bản gốc để đối soát với nguồn\norder_id_num BIGINT = 123         -- Kho tự ép về số nguyên để nối bảng nội bộ",
+    "pitfall": "Cố chấp JOIN chuỗi `'ORD-123'` với con số `123`. Kết quả không khớp dòng nào. Các bản cập nhật gửi trễ (late-arriving) bị hệ thống tưởng là đơn hàng mới, lặng lẽ nhân đôi doanh thu mà không báo lỗi[cite: 8, 12].",
+    "sourceLink": { "text": "Kimball Surrogate Keys", "url": "https://www.kimballgroup.com/1998/05/surrogate-keys/" }
+  },
+  {
+    "id": "c_pii_hash_normalization",
+    "subject": "Cleansing",
+    "term": "30. Che giấu PII & Bẫy chuẩn hóa Hash",
+    "pronounceOrType": "Bảo vệ dữ liệu cá nhân & Năng lực đếm trùng",
+    "definition": "Dữ liệu định danh cá nhân (PII như email, SĐT) phải được che giấu. Dùng hàm Băm một chiều (Hash) để che nội dung nhưng vẫn giữ được khả năng đếm số khách hàng trùng lặp (Dedupe). NHƯNG, hàm băm cực kỳ nhạy cảm với hình thức: `John@x.com` và `john@x.com` sinh ra 2 mã hash hoàn toàn khác biệt. Phải chuẩn hóa văn bản trước khi băm.",
+    "formulaOrSyntax": "-- CÚ PHÁP ĐÚNG: Chuẩn hóa ngay bên trong hàm hash\nmd5(lower(trim(email))) AS email_hash",
+    "pitfall": "Chỉ viết `md5(email)`. Hệ thống vẫn băm ra mã, nhưng các email trùng lặp về bản chất lại không khớp mã với nhau. Pipeline âm thầm đánh mất hoàn toàn khả năng đếm khách hàng trùng lặp mà chính sách đã hứa hẹn[cite: 12].",
+    "sourceLink": { "text": "NIST De-identification", "url": "https://csrc.nist.gov/glossary/term/de_identification" }
+  },
+
+  /* ─────────── CHIẾN LƯỢC NẠP, XUẤT BẢN & ĐỐI SOÁT ─────────── */
+  {
+    "id": "c_load_strategy_tradeoffs",
+    "subject": "Pipeline Lifecycle",
+    "term": "31. Đánh đổi chiến lược nạp: Window Refresh vs. Upsert",
+    "pronounceOrType": "Quyết định chuyển chi phí tính toán",
+    "definition": "Làm sao nạp các bản cập nhật trạng thái đơn hàng gửi trễ? \n- Upsert (MERGE) cập nhật trực tiếp dòng cũ rất nhanh, nhưng file Parquet trên Lake là bất biến (immutable), không hỗ trợ sửa dòng.\n- Window Refresh: Xóa nguyên cụm dữ liệu 7 ngày rồi ghi mới lại từ đầu. Chấp nhận tốn công ghi đè lặp đi lặp lại 5 lần dữ liệu, để đổi lấy việc bảng trên đĩa luôn sạch, tốc độ truy vấn nhanh nhất và không bắt phía dashboard gánh tải lọc trùng lặp.",
+    "formulaOrSyntax": "-- Cấu hình trong các công cụ thực tế (dbt / SQLMesh):\nincremental_strategy = 'delete+insert' (Window Refresh)\nincremental_strategy = 'merge' (Upsert)",
+    "pitfall": "Đặt cửa sổ nạp hẹp đúng 1 ngày `[D, D]` cho nhanh. Các bản sửa đổi của đơn hàng gửi trễ rơi vào phân vùng `D-3` sẽ bị bỏ lọt vĩnh viễn. Đơn hàng kẹt luôn ở trạng thái cũ rích[cite: 10].",
+    "sourceLink": { "text": "SQLMesh Model Kinds", "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/models/model_kinds/" }
+  },
+  {
+    "id": "c_bitemporality_late_arriving",
+    "subject": "Data Modeling",
+    "term": "32. Bi-temporality & Cái bẫy của Upsert",
+    "pronounceOrType": "Xung đột Thời gian sự kiện vs Thời gian nhận file",
+    "definition": "Hệ thống luôn có hai mốc thời gian: Lúc sự kiện thực sự xảy ra (Event Time, vd `updated_at`) và lúc hệ thống nhận được file (Ingestion Time). Một bản sửa đổi gửi muộn hoàn toàn có thể mang nội dung cũ hơn chính bản đang có trong kho. Quyền quyết định phiên bản nào thắng phải thuộc về `updated_at`, tuyệt đối không theo thứ tự file về.",
+    "formulaOrSyntax": "-- Cú pháp chặn bản cũ đè bản mới trong MERGE:\nWHEN MATCHED AND nguồn.updated_at > đích.updated_at THEN UPDATE",
+    "pitfall": "Bỏ quên điều kiện `nguồn > đích`. Lệnh nạp vẫn chạy mượt mà exit 0, số đếm (count) cuối ngày khớp tuyệt đối, nhưng hàng chục nghìn đơn hàng bị ghi đè ngược lùi về trạng thái cũ (Silent Failure)[cite: 10].",
+    "sourceLink": { "text": "Martin Fowler Bitemporal", "url": "https://martinfowler.com/articles/bitemporal-history.html" }
+  },
+  {
+    "id": "c_reconciliation_content_diff",
+    "subject": "Quality Gate",
+    "term": "33. Đếm dòng không phải là Đối soát (Reconciliation)",
+    "pronounceOrType": "Phép kiểm tra ngoại trừ hai chiều",
+    "definition": "Đếm `count(*)` chỉ trả lời câu 'Có đủ số lượng không?', nó câm điếc trước câu 'Nội dung bên trong có đúng không?'. Lệch cửa sổ nạp làm 5000 đơn hàng kẹt ở phiên bản cũ, nhưng tổng số đếm vẫn bằng y hệt. Muốn đối soát chuẩn, phải kiểm tra trừ chéo nội dung (EXCEPT) theo cả hai chiều.",
+    "formulaOrSyntax": "-- Đối soát nội dung tuyệt đối:\nSELECT * FROM a EXCEPT SELECT * FROM b;  -- Chiều 1: B thiếu gì của A?\nSELECT * FROM b EXCEPT SELECT * FROM a;  -- Chiều 2: B thừa gì so với A?",
+    "pitfall": "Dừng lại và ăn mừng khi thấy count hai bên khớp nhau. Thực tế sai lệch cấu trúc ngầm bên trong (1% dữ liệu mang giá trị sai) vẫn chui thẳng ra báo cáo sản xuất[cite: 10].",
+    "sourceLink": { "text": "dbt-audit-helper", "url": "https://github.com/dbt-labs/dbt-audit-helper" }
+  },
+  {
+    "id": "c_torn_read",
+    "subject": "Reliability & Ops",
+    "term": "34. Torn Read (Đọc trúng lúc đang ghi dở)",
+    "pronounceOrType": "Sự cố văng dashboard khi lưu trữ trên File",
+    "definition": "Ghi đè file Parquet không có cơ chế bảo vệ giao dịch (Transaction) như trong cơ sở dữ liệu. Bước 1 xóa file cũ, Bước 2 ghi file mới. Quá trình ghi này tốn vài giây đến vài phút. Nếu người dùng mở dashboard truy vấn đúng vào khoảng trống thời gian đó, họ sẽ đọc trúng phần dữ liệu dở dang (Torn Read), nhận về số 0 tròn trĩnh hoặc bị văng lỗi.",
+    "formulaOrSyntax": "DELETE FROM <thư_mục_partition>;        \n-- KHOẢNG TRỐNG NGUY HIỂM (Dashboard hiển thị số 0)\nCOPY (...) TO '<thư_mục_partition>';",
+    "pitfall": "Tự mãn vì job nạp dữ liệu chạy xong không lỗi lầm. Job xanh mượt nhưng người dùng hứng chịu khoảng thời gian sập dữ liệu thì đó vẫn là một hệ thống thiết kế lỗi[cite: 11].",
+    "sourceLink": { "text": "Delta Lake Atomicity", "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md" }
   },
   {
     "id": "c_atomic_swap",
     "subject": "Reliability & Ops",
-    "term": "32. Atomic Swap (Build ➔ Rename)",
-    "pronounceOrType": "Không để ai đọc thấy trạng thái nửa vời",
-    "definition": "Trong lúc bạn dựng lại một bảng, người dùng vẫn đang query nó. TRUNCATE rồi INSERT tạo ra cửa sổ vài phút mà bảng rỗng hoặc thiếu dữ liệu. Cách đúng: dựng bảng mới HOÀN CHỈNH ở tên tạm, rồi đổi tên — thao tác đổi tên là nguyên tử.",
-    "formulaOrSyntax": "-- SAI: có cửa sổ bảng rỗng\nTRUNCATE core.orders;\nINSERT INTO core.orders SELECT ...;   -- 3 phút bảng thiếu dữ liệu\n\n-- ĐÚNG: build ➔ swap\nCREATE OR REPLACE TABLE core.orders_new AS SELECT ...;\nBEGIN;\n  DROP TABLE IF EXISTS core.orders_old;\n  ALTER TABLE core.orders     RENAME TO orders_old;\n  ALTER TABLE core.orders_new RENAME TO orders;\nCOMMIT;\n-- orders_old giữ lại làm bản rollback tức thì",
-    "pitfall": "Chỉ nghĩ tới bảng đích mà quên các thứ phụ thuộc: view, index, hoặc mart đang đọc từ nó. Swap xong phải kiểm tra chúng còn trỏ đúng chỗ.",
-    "sourceLink": {
-      "text": "DuckDB — ALTER TABLE",
-      "url": "https://duckdb.org/docs/sql/statements/alter_table"
-    }
+    "term": "35. Atomic Swap (Hoán đổi thư mục tức thì)",
+    "pronounceOrType": "Tuyệt chiêu xuất bản dữ liệu không gây gián đoạn",
+    "definition": "Luật chốt: Đừng bao giờ sửa trực tiếp thứ người đọc đang nhìn. Hãy dựng bản dữ liệu mới ở một thư mục tạm (khuất tầm nhìn), sau đó dùng lệnh đổi tên (rename) của hệ điều hành để tráo vào. Lệnh rename chỉ sửa mục lục (metadata) nên không phải di chuyển byte nào, tốn đúng vài phần nghìn giây.",
+    "formulaOrSyntax": "1. Dựng bản mới ➔ lake/.staging/part=1\n2. Cất bản cũ ➔ lake/.trash/part=1\n3. Tráo bản mới ➔ lake/orders/part=1",
+    "pitfall": "Thư mục tạm `.staging/` được đặt ngay bên trong thư mục đang phục vụ `orders/`. Trình đọc quét file quét theo mẫu `orders/*/*.parquet` sẽ vơ luôn cả file tạm vào, nhân đôi doanh thu trong im lặng[cite: 11].",
+    "sourceLink": { "text": "Iceberg Snapshots", "url": "https://iceberg.apache.org/spec/#snapshots" }
   },
+
+  /* ─────────── TỰ ĐỘNG HÓA VÀ VẬN HÀNH BỀN BỈ ─────────── */
   {
-    "id": "c_orchestration",
-    "subject": "Reliability & Ops",
-    "term": "33. Orchestration & DAG",
-    "pronounceOrType": "Ai chạy job, theo thứ tự nào, khi nào",
-    "definition": "Pipeline thật gồm nhiều bước phụ thuộc nhau. DAG (đồ thị có hướng không chu trình) mô tả thứ tự đó. Orchestrator lo bốn việc mà một script tự viết không có: lịch chạy, thử lại khi lỗi, chạy song song nhánh độc lập, và báo động khi hỏng.",
-    "formulaOrSyntax": "extract ➔ contract_gate ➔ stage ➔ validate ➔ load_core ➔ build_marts\n                                        ↘ quarantine\n\n# Bốn thứ orchestrator lo hộ:\n#  1. schedule    — 02:00 UTC mỗi ngày\n#  2. retry       — lỗi mạng thử lại 3 lần, cách 5 phút\n#  3. dependency  — build_marts chỉ chạy khi load_core xong\n#  4. alerting    — job fail ➔ báo động ngay, không đợi ai phát hiện\n\n# Công cụ phổ biến: Airflow, Dagster, Prefect",
-    "pitfall": "Dùng cron thay orchestrator: cron không biết bước trước đã xong chưa, không thử lại, không báo động, và không trả lời được câu \"job hôm qua có chạy không\".",
-    "sourceLink": {
-      "text": "Airflow — Core concepts",
-      "url": "https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/index.html"
-    }
-  },
-  {
-    "id": "c_benchmark_hygiene",
-    "subject": "SQL & Engine",
-    "term": "34. Benchmark Hygiene (Cold vs Warm)",
-    "pronounceOrType": "Luật đo hiệu năng",
-    "definition": "Lần đọc file đầu tiên trả giá đĩa; lần thứ hai lấy từ OS page cache và nhanh hơn nhiều dù code không đổi một dòng. So một lần chạy nguội với một lần chạy ấm cho ra kết luận không chỉ thiếu chính xác mà còn NGƯỢC HẲN.",
-    "formulaOrSyntax": "def timed(sql, runs=3):\n    times = []\n    for _ in range(runs):\n        t0 = time.perf_counter()\n        con.execute(sql).fetchall()\n        times.append(time.perf_counter() - t0)\n    return statistics.median(times)   # bỏ lần đầu, lấy trung vị\n\n-- Đọc kế hoạch thực thi thay vì đoán:\nEXPLAIN         SELECT ...;   -- engine ĐỊNH làm gì\nEXPLAIN ANALYZE SELECT ...;   -- engine ĐÃ làm gì, kèm thời gian từng bước",
-    "pitfall": "Tối ưu theo cảm giác: sửa query rồi thấy nhanh hơn nên kết luận là sửa đúng, trong khi thật ra chỉ là lần chạy thứ hai. Luôn chạy nhiều lần, lấy trung vị, và đọc EXPLAIN.",
-    "sourceLink": {
-      "text": "DuckDB — EXPLAIN ANALYZE",
-      "url": "https://duckdb.org/docs/guides/meta/explain_analyze"
-    }
-  },
-  {
-    "id": "c_violation_gap_tolerated",
-    "subject": "Quality Gate",
-    "term": "35. Violation / Gap / Tolerated",
-    "pronounceOrType": "Ba loại rác — phân theo trách nhiệm",
-    "definition": "Khi phát hiện dữ liệu bẩn, câu hỏi đầu tiên không phải 'sửa thế nào' mà 'contract có cấm chuyện này không'. Violation: contract cấm rõ, đổ lỗi được cho producer. Gap: contract im lặng, không đổ lỗi được cho ai vì họ chưa từng hứa. Tolerated: contract cho phép rõ ở mức tỉ lệ đó, không phải lỗi.",
-    "formulaOrSyntax": "Có clause cấm?  ─ không ─➔ GAP        (tự xử lý + đề xuất amendment)\n      │ có\n      ▼\nCó tolerance?   ─ không ─➔ VIOLATION zero-budget (báo incident)\n      │ có\n      ▼\nrate <= tolerance ─➔ trong ngưỡng (vẫn đếm, báo cáo theo SLO)\nrate >  tolerance ─➔ hard-fail, chặn cả lô",
-    "pitfall": "Xếp mọi bất ngờ vào violation. Đổ lỗi cho producer về một lời hứa chưa từng có sẽ đốt uy tín cần dùng cho sự cố thật. Ngược lại, dòng nằm trong tolerance vẫn là vi phạm phải đếm — tolerance là ngưỡng hard-fail, không phải giấy phép. Loại thứ ba dễ bỏ sót: check của chính consumer NGHIÊM HƠN contract (gate chặn cột thừa trong khi contract ghi rõ consumer phải chịu được cột lạ). Đó là quyết định thiết kế đơn phương, không phải điều khoản — phải biết mình đang đứng ở đâu trước khi gọi cho producer.",
-    "sourceLink": {
-      "text": "Data Contracts Architecture",
-      "url": "https://datacontracts.com/"
-    }
-  },
-  {
-    "id": "c_semver_data_contract",
-    "subject": "Pipeline Lifecycle",
-    "term": "36. Semantic Versioning (semver) & Change Management",
-    "pronounceOrType": "MAJOR.MINOR.PATCH — hợp đồng về THỜI GIAN, không phải nhãn",
-    "definition": "Chuẩn semver 2.0.0: version là bộ ba số MAJOR.MINOR.PATCH, mỗi số có luật tăng riêng và KHÔNG BAO GIỜ giảm. Áp cho data contract thì mỗi mức bump còn gắn thêm một thời hạn báo trước — version không chỉ nói 'đã đổi gì' mà nói 'bên kia có bao lâu để chuẩn bị'. Tiêu chí phân biệt breaking không phải 'consumer có phải sửa code không' (thêm cột cũng bắt sửa) mà là 'có thứ gì ĐANG CHẠY bị phá không'.",
-    "formulaOrSyntax": "MAJOR ➔ thay đổi PHÁ tương thích ngược. Bump MAJOR thì MINOR và PATCH về 0.\nMINOR ➔ thêm chức năng, vẫn tương thích ngược. Bump MINOR thì PATCH về 0.\nPATCH ➔ sửa lỗi / làm rõ câu chữ, không đổi hành vi.\n1.9.3 ➔ 1.10.0 (KHÔNG phải 2.0.0) — mỗi số tăng độc lập, không nhớ thập phân\n\n0.y.z  ➔ giai đoạn phát triển ban đầu: KHÔNG có cam kết ổn định nào, mọi thứ đổi bất cứ lúc nào\n1.0.0  ➔ mốc công khai API/contract. Từ đây luật trên mới có hiệu lực\n1.0.0-rc.1     ➔ pre-release, XẾP TRƯỚC 1.0.0\n1.0.0+build.5  ➔ build metadata, BỎ QUA khi so thứ tự\n\n-- Áp cho data contract:\nMAJOR ➔ đổi tên / xoá cột / đổi kiểu / đổi ngữ nghĩa  ─ báo trước 30 ngày\nMINOR ➔ thêm cột, thêm ràng buộc, mở rộng enum        ─ báo trước 7-14 ngày\nPATCH ➔ sửa comment, làm rõ mô tả                     ─ không cần báo\nstatus: draft ➔ proposed ➔ agreed ➔ deprecated\n-- consumer chỉ được DỰA VÀO một clause khi status = agreed",
-    "pitfall": "Bốn lỗi hay gặp. (1) Coi version là số thập phân: sau 1.9 là 1.10 chứ không phải 2.0. (2) Ở lại 0.y.z mãi mãi rồi vẫn để người khác phụ thuộc — 0.x nghĩa là KHÔNG hứa gì cả. (3) Bump MAJOR mà quên reset MINOR/PATCH về 0. (4) Riêng với data: thêm giá trị vào allowed_values rồi coi là vô hại — với producer đúng là vô hại, nhưng consumer có whitelist cứng sẽ đẩy toàn bộ bản ghi mới vào quarantine, mà change_management thường IM LẶNG về trường hợp này. Nguy hiểm nhất là đổi NGỮ NGHĨA mà giữ nguyên schema (UTC ➔ giờ local): mọi gate dựa trên tên/kiểu/thứ tự cột đều mù, phải bắt bằng semantic check so với baseline lịch sử.",
-    "sourceLink": {
-      "text": "Semantic Versioning 2.0.0",
-      "url": "https://semver.org/"
-    }
-  },
-  {
-    "id": "c_preflight_gate",
-    "subject": "Quality Gate",
-    "term": "37. Pre-flight Gate (Shift-Left Validation)",
-    "pronounceOrType": "Chốt kiểm đặt trước khi đọc dữ liệu",
-    "definition": "Khác với validation của quality gate — chạy sau khi dữ liệu đã vào staging và hỏi 'dữ liệu này đủ tốt để nạp chưa' — pre-flight gate chạy trước khi đọc dòng nào và hỏi 'file này có đúng thứ đã thoả thuận không'. Kiểm theo tầng và dừng sớm khi tầng sâu hơn mất ý nghĩa.",
-    "formulaOrSyntax": "1. tên file      ─ sai feed thì không cần đọc tiếp (return ngay)\n2. manifest      ─ bytes trên đĩa == manifest.bytes\n3. schema        ─ tên cột VÀ thứ tự cột, đối chiếu contract\n4. probe giá trị ─ TRY_CAST trên MẪU, all_varchar=true\n5. cửa sổ sửa trễ ─ min/max ts so với business_date\n-- exit 0 = pass, exit 1 = fail ➔ cắm vào đầu script load",
-    "pitfall": "Để engine tự đoán kiểu khi probe. Kiểu suy ra sẽ TRÔI theo rác: sniffer gọi customer_id là DOUBLE vì 0.2% rác Excel-float, gọi order_total là VARCHAR, và gán cho updated_at một TIMESTAMP WITH TIME ZONE mà chẳng ai hứa. Điểm cố định để đối chiếu là block schema của contract, không phải dữ liệu. Đọc all_varchar rồi tự TRY_CAST. Và gate phải RẺ — bỏ LIMIT lấy mẫu thì sweep đọc hàng chục GB, mà gate đắt là gate bị bỏ qua.",
-    "sourceLink": {
-      "text": "Great Expectations — Validation",
-      "url": "https://docs.greatexpectations.io/"
-    }
-  },
-  {
-    "id": "c_config_validation",
-    "subject": "Reliability & Ops",
-    "term": "38. Config Validation (validate cái validator)",
-    "pronounceOrType": "Typed config — pydantic / JSON Schema",
-    "definition": "Gate rất nghiêm với dữ liệu nhưng thường cả tin với chính file cấu hình của nó. yaml.safe_load trả về dict trần, nên mọi phép tra sau đó chỉ là đoán về một file do người sửa tay. Model có kiểu bắt lỗi ngay lúc đọc, kèm đường dẫn tới đúng trường sai.",
-    "formulaOrSyntax": "class Clause(BaseModel):\n    model_config = ConfigDict(extra=\"forbid\")   # key lạ = LỖI, không phải bỏ qua\n\nclass Money(Clause):\n    negative_allowed: bool      # ghim KIỂU, không chỉ ghim tên key\n\n# Contract.model_validate(raw) ➔ nullible: schema.1.nullible — Extra inputs not permitted",
-    "pitfall": "Mặc định của pydantic là BỎ QUA key lạ. Gõ sai key bắt buộc thì vẫn có lỗi, nhưng gõ sai key tuỳ chọn (alowed_values:) bị nuốt im lặng y hệt yaml — một luật lặng lẽ ngừng tồn tại. Gate có luật bị tắt âm thầm còn tệ hơn không có gate, vì mình vẫn tin nó. Lưu ý YAML: `none` là CHUỖI chứ không phải null, và chuỗi khác rỗng là truthy.",
-    "sourceLink": {
-      "text": "Pydantic — Model Config",
-      "url": "https://docs.pydantic.dev/latest/api/config/"
-    }
-  },
-  {
-    "id": "c_pii_deidentification",
-    "subject": "Cleansing",
-    "term": "39. PII & De-identification (Hash / Mask / Tokenize / Generalize)",
-    "pronounceOrType": "Phổ che dữ liệu — chọn theo NĂNG LỰC cần giữ lại",
-    "definition": "PII là dữ liệu định danh được một người cụ thể, trực tiếp (email, CCCD, số điện thoại) hoặc gián tiếp qua tổ hợp quasi-identifier (ngày sinh + mã bưu chính + giới tính đủ để định danh phần lớn dân số). Khác mọi loại rác khác: gap thường gây SỐ SAI, gap PII gây NGHĨA VỤ THÔNG BÁO rò rỉ. De-identification là một PHỔ chứ không phải công tắc — đi từ giữ nguyên tới xoá hẳn, và mỗi nấc đánh đổi giữa mức riêng tư và năng lực phân tích còn lại.",
-    "formulaOrSyntax": "Phổ, từ ít riêng tư tới nhiều:\n  raw ➔ tokenize ➔ hash ➔ mask ➔ generalize ➔ k-anonymity ➔ differential privacy ➔ xoá\n\nTOKENIZE  ➔ thay bằng token; vault đảo ngược được. Khi bản gốc PHẢI quay lại (thanh toán)\nHASH      ➔ một chiều; quan hệ BẰNG NHAU còn ➔ join & dedupe chạy được\nMASK      ➔ giữ hình dạng cho mắt người (a***@x.com); KHÔNG bao giờ so bằng\nGENERALIZE➔ hạ độ chi tiết: ngày sinh ➔ nhóm tuổi, phường ➔ tỉnh\nk-ANON    ➔ mỗi tổ hợp quasi-identifier phải ứng với ít nhất k người\nDP        ➔ thêm nhiễu có kiểm soát; bảo đảm toán học, trả giá bằng độ chính xác\n\n-- Hash phải CHUẨN HOÁ BÊN TRONG, và nên có salt nếu miền giá trị nhỏ:\nmd5(lower(trim(email)))                     -- đủ cho dedupe nội bộ\nsha256(lower(trim(phone)) || :pepper)       -- miền hẹp thì hash trần bị dò ngược được\n\n-- ĐO NĂNG LỰC trước và sau khi phá cột, nếu không thì không chứng minh được là đã giữ:\nSELECT count(email)      - count(DISTINCT email)      FROM core.customers;  -- 180\nSELECT count(email_hash) - count(DISTINCT email_hash) FROM core.customers;  -- 180 y hệt",
-    "pitfall": "Ba cái bẫy. (1) Hash chưa chuẩn hoá: md5('John@X.com') khác md5('john@x.com'), âm thầm đánh mất đúng cái năng lực dedupe mà chính sách hứa. Chuẩn hoá TẠI NƠI hash, đừng dựa vào tầng thượng nguồn làm sạch hộ. (2) Tưởng hash là ẩn danh: với miền giá trị hữu hạn (số điện thoại, email phổ biến) thì dựng bảng tra ngược rẻ như bèo — cần salt/pepper, và về pháp lý dữ liệu đã hash vẫn thường bị coi là PSEUDONYMOUS chứ không phải anonymous. (3) Chỉ che cột trực tiếp mà quên quasi-identifier: xoá tên nhưng giữ ngày sinh + mã bưu chính + giới tính thì vẫn định danh được. Dấu hiệu chính sách đã có hiệu lực: chạy lại phép dựng lần hai thì hỏng ngay — Binder Error: Referenced column \"email\" not found. Không còn giá trị thô để hash lại, cũng không còn để rò rỉ.",
-    "sourceLink": {
-      "text": "NIST — De-identification",
-      "url": "https://csrc.nist.gov/glossary/term/de_identification"
-    }
-  },
-  {
-    "id": "c_contract_anatomy",
-    "subject": "Pipeline Lifecycle",
-    "term": "40. Data Contract Anatomy (tám khối)",
-    "pronounceOrType": "Cấu trúc một bản contract, khối nào trả lời câu gì",
-    "definition": "Data contract không phải file schema. Schema chỉ trả lời 'dữ liệu trông thế nào'; một contract đầy đủ còn phải trả lời 'ai chịu trách nhiệm', 'giao khi nào', 'sai bao nhiêu thì chặn', và 'muốn đổi thì báo trước bao lâu'. Thiếu khối nào thì chỗ đó thành khoảng trống không ai chịu trách nhiệm.",
-    "formulaOrSyntax": "producer / consumer  ➔ AI chịu trách nhiệm, liên hệ ở đâu, escalate cho ai\ndelivery             ➔ đường dẫn, định dạng, lịch giao, SLA độ tươi, tín hiệu hoàn tất\nschema               ➔ từng cột: kiểu, nullable, enum, đơn vị, timezone, tham chiếu\nquality              ➔ tolerance từng luật, quy tắc đối soát, chính sách trùng lặp\nchange_management    ➔ semver + thời hạn báo trước + kênh thông báo\nbusiness_rules       ➔ ràng buộc liên cột và chuyển trạng thái hợp lệ\nslo_reporting        ➔ ai gửi gì cho ai, định kỳ bao lâu\nversion / status     ➔ 1.3.0, agreed, effective_from\n\n-- Đọc contract thì hỏi từng cột: kiểu THẬT là gì, có null được không, lặp được không,\n-- timezone nào, đơn vị nào, ai sở hữu ý nghĩa — và ĐIỀU GÌ KHÔNG ĐƯỢC VIẾT RA?",
-    "pitfall": "Coi contract là schema rồi bỏ qua các khối còn lại. Thiếu delivery thì không ai biết mấy giờ file trễ mới thành sự cố. Thiếu change_management thì mọi thay đổi đều là bất ngờ. Và khối nguy hiểm nhất là khối KHÔNG CÓ: chỗ contract im lặng vẫn định hình thiết kế y như chỗ nó nói rõ, chỉ khác là không ai chịu trách nhiệm. Contract tốt tự đánh dấu những chỗ im lặng đó.",
-    "sourceLink": {
-      "text": "Data Contracts",
-      "url": "https://datacontracts.com/"
-    }
-  },
-  {
-    "id": "c_sli_slo_sla",
-    "subject": "Reliability & Ops",
-    "term": "41. SLI / SLO / SLA & Error Budget",
-    "pronounceOrType": "Ba tầng cam kết chất lượng — đo, mục tiêu, chế tài",
-    "definition": "Ba từ hay bị dùng lẫn. SLI là con số ĐO ĐƯỢC (tỉ lệ dòng hỏng, độ trễ, độ tươi). SLO là MỤC TIÊU đặt trên SLI đó, nội bộ, dùng để quyết định khi nào dừng tính năng mới mà đi sửa độ tin cậy. SLA là HỢP ĐỒNG với bên ngoài, có chế tài khi vi phạm — nên SLA luôn lỏng hơn SLO, để còn chỗ xoay xở trước khi thành chuyện pháp lý. Tolerance trong data contract chính là SLO cho chất lượng dữ liệu.",
-    "formulaOrSyntax": "SLI ➔ null_or_invalid_status = 0.30%   (đo được, không ý kiến)\nSLO ➔ phải <= 1%                       (mục tiêu; quá thì hard-fail)\nSLA ➔ file phải về trước 04:00 UTC     (quá thì là incident của producer)\n\nerror_budget = 1 - SLO\n  SLO 99.9% uptime ➔ ngân sách 43 phút chết mỗi tháng\n  Còn ngân sách ➔ cứ ship. Hết ngân sách ➔ đóng băng tính năng, đi sửa độ tin cậy.\n\n-- SLO chỉ có nghĩa khi có LỊCH SỬ. Đo một lần chỉ thấy hôm nay:\nCREATE TABLE ops.contract_checks (\n  run_at TIMESTAMP, check_name VARCHAR, rate DOUBLE, tolerance DOUBLE, passed BOOLEAN);\nSELECT run_at, rate, tolerance FROM ops.contract_checks\nWHERE check_name = 'null_or_invalid_status' ORDER BY run_at;   -- đường xu hướng",
-    "pitfall": "Đặt SLO bằng 100%: không còn error budget thì mọi sự cố nhỏ đều là khủng hoảng, và đội sẽ học cách giấu sự cố. Đặt SLA chặt bằng SLO: hết chỗ xoay xở, vi phạm nội bộ lập tức thành vi phạm hợp đồng. Và lỗi âm thầm nhất: chỉ kiểm SLI theo từng lần chạy mà không lưu lịch sử — một tỉ lệ bò từ 0.15% lên 0.9% qua nhiều tuần vẫn PASS mọi lần, nhưng nó đang tiến thẳng về ngưỡng và không ai thấy.",
-    "sourceLink": {
-      "text": "Google SRE Book — Service Level Objectives",
-      "url": "https://sre.google/sre-book/service-level-objectives/"
-    }
-  },
-  {
-    "id": "c_acid_transaction",
-    "subject": "Reliability & Ops",
-    "term": "42. ACID & Transaction (Atomicity · Consistency · Isolation · Durability)",
-    "pronounceOrType": "Bốn bảo đảm của một transaction — BEGIN / COMMIT / ROLLBACK",
-    "definition": "Transaction là một nhóm lệnh được engine đối xử như MỘT thao tác duy nhất. Bốn chữ ACID là bốn bảo đảm khác nhau, hay bị gộp làm một:\n• Atomicity — ăn cả ngã về không: hoặc mọi lệnh có hiệu lực, hoặc không lệnh nào.\n• Consistency — kết thúc transaction, mọi ràng buộc (khoá chính, khoá ngoại, CHECK) vẫn đúng; engine từ chối commit nếu không.\n• Isolation — nhiều transaction chạy đồng thời cho kết quả như thể chúng chạy lần lượt; mức isolation quyết định mỗi transaction thấy được gì của transaction khác.\n• Durability — đã COMMIT là còn, kể cả khi mất điện ngay sau đó; write-ahead log ghi trước, dữ liệu ghi sau.",
-    "formulaOrSyntax": "BEGIN TRANSACTION;\n  DELETE FROM core.orders WHERE _data_date = DATE '2026-06-02';\n  INSERT INTO core.orders SELECT * FROM stg_day;\n  UPDATE ops.etl_runs SET status='success' WHERE run_id = 57;\nCOMMIT;   -- lỗi ở bất kỳ đâu ➔ ROLLBACK, warehouse như chưa từng chạy\n\n-- Bốn mức isolation, từ lỏng tới chặt, và thứ mỗi mức còn cho lọt:\nREAD UNCOMMITTED ➔ dirty read (thấy dữ liệu chưa commit của người khác)\nREAD COMMITTED   ➔ non-repeatable read (đọc lại cùng dòng ra giá trị khác)\nREPEATABLE READ  ➔ phantom read (đọc lại cùng điều kiện ra thêm dòng mới)\nSERIALIZABLE     ➔ không lọt gì, trả giá bằng thông lượng\n-- DuckDB dùng snapshot isolation (MVCC): mỗi transaction thấy một ảnh chụp nhất quán",
-    "pitfall": "Nhầm atomicity của DATABASE với atomicity của FILE SYSTEM. Ghi Parquet ra lake KHÔNG nằm trong transaction của engine — muốn nguyên tử ở tầng file thì phải dựng thư mục tạm rồi đổi tên (atomic swap, khái niệm 32). Hai lỗi hay gặp nữa: (1) để lệnh ghi audit log NGOÀI transaction, khiến ledger khai thành công cho dữ liệu đã bị rollback; (2) tưởng cứ có transaction là an toàn trước ghi đồng thời — cái đó là ISOLATION, một chữ khác, và mức mặc định thường lỏng hơn bạn nghĩ.",
-    "sourceLink": {
-      "text": "DuckDB — Transaction Management",
-      "url": "https://duckdb.org/docs/sql/statements/transactions"
-    }
-  },
-  {
-    "id": "c_retry_backoff",
-    "subject": "Reliability & Ops",
-    "term": "43. Transient vs Deterministic Failure & Retry Policy",
-    "pronounceOrType": "Phân loại lỗi TRƯỚC khi quyết định retry",
-    "definition": "Retry chỉ có nghĩa với lỗi TẠM THỜI — mạng chập, file bị khoá, service quá tải, rate limit: thử lại sau vài giây thì thành công. Lỗi TẤT ĐỊNH — schema sai, file không tồn tại, dữ liệu hỏng, chia cho 0 — chạy lại một triệu lần vẫn hỏng y hệt, chỉ tốn thời gian và chôn sâu nguyên nhân thật. Phân loại lỗi là một QUYẾT ĐỊNH THIẾT KẾ, không phải chi tiết cài đặt.",
-    "formulaOrSyntax": "for attempt in range(1, MAX + 1):\n    try: return work()\n    except TransientError as e:\n        if attempt == MAX: raise            # hết lượt ➔ báo động\n        delay = min(BASE * 2 ** (attempt-1), MAX_DELAY)\n        time.sleep(delay + random.uniform(0, JITTER))\n    except DeterministicError: raise        # KHÔNG retry, fail ngay\n\nbackoff: 1s ➔ 2s ➔ 4s ➔ 8s ➔ 16s ➔ 30s (trần)\njitter  : cộng nhiễu ngẫu nhiên để cả đàn client không dội cùng một thời điểm\n\n-- Ba chính sách TÁCH BIỆT, đừng gộp:\nretry policy  ➔ thử lại mấy lần, chờ bao lâu\nalert policy  ➔ khi nào đánh thức người trực\ncircuit breaker ➔ khi service hỏng kéo dài thì NGỪNG gọi hẳn một thời gian",
-    "pitfall": "Bọc `except Exception` rồi retry tất: lỗi tất định bị lặp tới hết lượt, và stack trace thật bị chôn dưới lần thất bại cuối. Thiếu jitter thì mọi client retry đúng một thời điểm, dồn tải đúng lúc hệ thống đang yếu (thundering herd). Và đừng gộp retry với alert: đặt max_attempts quá thấp thì mọi lỗi thoáng qua đều thành alert và người trực học cách bỏ qua alert; đặt quá cao thì lỗi thật bị giấu hàng chục phút. Retry chỉ AN TOÀN khi thao tác được retry là idempotent — retry một INSERT trần là nhân đôi dữ liệu.",
-    "sourceLink": {
-      "text": "Google SRE Book — Handling Overload",
-      "url": "https://sre.google/sre-book/handling-overload/"
-    }
-  },
-  {
-    "id": "c_order_independent_checksum",
-    "subject": "Reliability & Ops",
-    "term": "44. Order-independent Checksum",
-    "pronounceOrType": "Bằng chứng đo được cho tính idempotent",
-    "definition": "Muốn chứng minh chạy lại không đổi kết quả thì cần một con số so sánh được. Nhưng count(*) quá thô — đổi nội dung mà giữ số dòng thì không thấy — còn hash cả bảng theo thứ tự lại phụ thuộc thứ tự dòng, mà thứ tự dòng không được đảm bảo khi engine chạy song song. Lời giải là gom các hash bằng một phép GIAO HOÁN: xor, sum, hoặc count(DISTINCT).",
-    "formulaOrSyntax": "SELECT count(*) AS n,\n       bit_xor(hash(order_id, updated_at, status, order_total)) AS checksum\nFROM core.orders WHERE _data_date = DATE '2026-06-03';\n-- chạy lần 1 và lần 2 phải ra HAI cặp số giống hệt\n\n-- CHỌN CỘT có chủ đích: chỉ hash cột NGHIỆP VỤ.\n-- Cột lineage (_run_id, loaded_at) ĐÁNG LẼ phải khác giữa hai lần chạy —\n-- đó là lịch sử được ghi lại, không phải dữ liệu thay đổi.\n\nbit_xor ➔ giao hoán, kết hợp; nhưng hai dòng GIỐNG HỆT triệt tiêu nhau\nsum     ➔ giao hoán, giữ được bản trùng; cẩn thận tràn số\nkèm count(*) để bù điểm mù của bit_xor",
-    "pitfall": "Dùng string_agg hoặc list rồi hash: kết quả đổi mỗi lần engine đổi thứ tự đọc, nên test đỏ ngẫu nhiên và mất niềm tin. Chỉ so count(*) thì một lần chạy lại làm hỏng nội dung nhưng giữ nguyên số dòng sẽ lọt qua. Dùng bit_xor một mình thì một cặp dòng trùng khít triệt tiêu nhau và biến mất khỏi checksum — luôn kèm count(*). Và giá trị hash() phụ thuộc bản cài engine: chỉ so checksum của chính mình qua thời gian, đừng so với máy khác.",
-    "sourceLink": {
-      "text": "DuckDB — Aggregate Functions",
-      "url": "https://duckdb.org/docs/sql/functions/aggregates"
-    }
-  },
-  {
-    "id": "c_load_strategy_trilemma",
-    "subject": "Pipeline Lifecycle",
-    "term": "45. Load Strategy: Append / Upsert / Partition Refresh",
-    "pronounceOrType": "Ba cách nạp dữ liệu có sửa đổi — chọn một, không có cái nào thắng hết",
-    "definition": "Khi nguồn gửi lại bản sửa cho dữ liệu cũ, pipeline phải chọn một trong ba cách nạp. Mọi engine hiện đại đều đặt tên riêng cho đúng ba cái này.\n\nAPPEND — ghi nối mọi phiên bản vào một bảng log, rồi dùng view để lấy bản mới nhất lúc đọc. Ghi nhanh nhất, giữ được toàn bộ lịch sử. Đổi lại mọi câu query đều phải chạy dedupe.\n\nUPSERT — dùng MERGE để sửa từng dòng theo khoá. Ghi và đọc đều nhanh, nhưng ghi đè mất bản cũ, và chỉ chạy được trong database. File Parquet không sửa được từng dòng.\n\nPARTITION REFRESH — xoá cả partition rồi ghi lại từ nguồn. Ghi tốn nhất, cũng mất lịch sử, nhưng là cách duy nhất chạy được trên file lake.\n\nĐiểm cần thấy: công dedupe không mất đi, nó chỉ chuyển từ lúc đọc sang lúc ghi. Append trả công đó ở mỗi câu query; upsert và refresh trả một lần lúc nạp. Vì một bảng được đọc hàng nghìn lần mỗi ngày mà chỉ nạp một lần, nên trả lúc ghi rẻ hơn.\n\nSố đo trên 11,5 triệu dòng: append ghi 1,0× trong 24,7s nhưng count(*) qua view tốn 2,131s. Upsert ghi 1,0× trong 59,1s. Refresh ghi 5,2× trong 66,7s — gấp 5 lần số dòng mà chỉ chậm hơn upsert 13%, vì ghi một lượt lớn rẻ hơn hàng triệu lần tìm khoá rời rạc.\n\nMột điều dễ đoán sai: công dedupe lúc đọc KHÔNG giữ nguyên tỉ lệ khi dữ liệu lớn lên. Nó từ chậm 13 lần thành chậm 426 lần, vì count trên bảng thường chỉ đọc metadata còn window function thì phải quét thật.",
-    "formulaOrSyntax": "-- Ba model kind của SQLMesh chính là ba chiến lược này:\nINCREMENTAL_BY_TIME_RANGE   ➔ Refresh : DELETE theo khoảng thời gian rồi INSERT\nINCREMENTAL_BY_UNIQUE_KEY   ➔ Upsert  : MERGE theo khoá\nFULL / APPEND               ➔ Append  : nối thêm, hoặc dựng lại toàn bộ\n\n-- dbt gọi cùng ba thứ đó là incremental_strategy:\n{{ config(materialized='incremental', incremental_strategy='delete+insert') }}  -- Refresh\n{{ config(materialized='incremental', incremental_strategy='merge') }}         -- Upsert\n{{ config(materialized='incremental', incremental_strategy='append') }}        -- Append",
-    "pitfall": "Chọn upsert vì nó ghi ít nhất, rồi phát hiện Parquet không sửa từng dòng được — phải viết lại pipeline khi chuyển sang lakehouse. Chiều ngược lại cũng có: chọn refresh rồi để cửa sổ lookback nới lên 30 ngày, lúc đó số dòng phải ghi lại vọt lên và upsert nhanh hơn hẳn. Con số '5,2× mà chỉ chậm 13%' chỉ đúng với cửa sổ 7 ngày.",
-    "sourceLink": {
-      "text": "SQLMesh — Model kinds (ba kind, kèm SQL mà engine sinh ra cho từng loại)",
-      "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/models/model_kinds/"
-    }
-  },
-  {
-    "id": "c_merge_semantics",
-    "subject": "SQL Fundamentals",
-    "term": "46. MERGE — hai điều kiện để upsert chạy đúng",
-    "pronounceOrType": "Engine không kiểm tra hộ, cả hai đều phải tự lo",
-    "definition": "MERGE trông đơn giản nhưng chỉ cho kết quả đúng khi thoả hai điều kiện, và không điều kiện nào được engine kiểm tra giúp.\n\nĐIỀU KIỆN 1 — bảng nguồn phải có đúng một dòng cho mỗi khoá. Nếu nguồn có hai dòng cùng order_id, MERGE không báo lỗi. Nó lấy bừa một dòng rồi báo chạy xong. Vì vậy phải dedupe nguồn ở staging trước khi merge.\n\nĐIỀU KIỆN 2 — mệnh đề UPDATE phải kèm điều kiện so sánh phiên bản. Không có nó, một bản sửa cũ về sau sẽ ghi đè lên dòng mới hơn. Lúc đó bảng của bạn chạy theo luật 'file nào về sau thì thắng' chứ không phải 'phiên bản nào mới nhất thì thắng'.\n\nDấu hiệu cho thấy đây là luật chung chứ không riêng bài lab: SQLMesh cho khai báo đúng hai thứ này thành hai tham số — unique_key cho điều kiện 1, when_matched cho điều kiện 2.",
-    "formulaOrSyntax": "-- Điều kiện 1: dedupe nguồn trước khi merge\nCREATE OR REPLACE TEMP TABLE stg AS SELECT * EXCLUDE (rn) FROM (\n  SELECT *, row_number() OVER (PARTITION BY id ORDER BY updated_at DESC) rn\n  FROM src) WHERE rn = 1;\n\n-- Điều kiện 2: so sánh bằng dấu > (dấu này cũng loại luôn trường hợp bằng nhau)\nMERGE INTO tgt t USING stg s ON t.id = s.id\nWHEN MATCHED AND s.updated_at > t.updated_at THEN UPDATE\nWHEN NOT MATCHED THEN INSERT;\n\n-- Khai báo tương đương trong SQLMesh:\nkind INCREMENTAL_BY_UNIQUE_KEY (\n  unique_key id,\n  when_matched WHEN MATCHED AND source.updated_at > target.updated_at THEN UPDATE SET ...\n)",
-    "pitfall": "Bỏ điều kiện so sánh: job vẫn chạy, count cuối vẫn khớp tuyệt đối, nhưng hàng chục nghìn dòng bị ghi đè bằng phiên bản cũ. Đo thực tế: điều kiện đó chặn đúng 38.090 dòng trên 11,5 triệu. Bỏ nó thì 38.090 đơn hàng mang giá trị sai, mà không có test đếm dòng nào phát hiện ra.",
-    "sourceLink": {
-      "text": "SQLMesh — Incremental by unique key (unique_key, when_matched, merge_filter)",
-      "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/models/model_kinds/"
-    }
-  },
-  {
-    "id": "c_lookback_window",
-    "subject": "Pipeline Lifecycle",
-    "term": "47. Lookback window cho dữ liệu về trễ",
-    "pronounceOrType": "Độ rộng cửa sổ lấy từ contract, không tự đoán",
-    "definition": "Nguồn gửi bản sửa trễ so với ngày nghiệp vụ của dòng đó: một đơn hàng ngày 01/06 có thể được sửa và gửi lại trong file ngày 06/06. Khi refresh, cửa sổ phải rộng đủ để phủ hết những partition mà bản sửa đang về có thể thuộc vào.\n\nĐộ rộng cửa sổ không được đoán. Nó là cam kết ghi trong data contract (late_corrections.window_days), và code phải đọc từ đó thay vì viết cứng số 7 vào query.\n\nĐây là chuyện phổ biến đến mức framework đặt hẳn một tham số cho nó. SQLMesh gọi là lookback, định nghĩa là 'số interval trước interval đang xử lý mà model cần đọc thêm để bắt dữ liệu về trễ'.\n\nCẩn thận đơn vị: lookback đếm theo interval_unit của model chứ không phải theo ngày. Model chạy mỗi 6 giờ mà đặt lookback 4 thì không được 24 giờ nhìn lại.",
-    "formulaOrSyntax": "lo = max(START, D - INTERVAL window_days DAY)\nDELETE FROM tgt WHERE part_date BETWEEN lo AND D;\nINSERT INTO tgt SELECT ... WHERE part_date BETWEEN lo AND D;\n-- window_days đọc từ: contract.late_corrections.window_days\n\n-- Khai báo tương đương trong SQLMesh:\nkind INCREMENTAL_BY_TIME_RANGE (\n  time_column transaction_date,\n  lookback 7          -- 7 interval_unit trước interval đang xử lý\n)",
-    "pitfall": "Dùng cửa sổ [D, D] cho gọn — chỉ xử lý đúng ngày đang nạp. Đo thực tế: số dòng chỉ lệch 1 (0,0002%, không ai để ý) nhưng 1,02% dữ liệu mang giá trị sai. Mọi đơn hàng có bản sửa về trễ đều kẹt ở giá trị gốc, vì bản sửa thuộc partition cũ hơn mà cửa sổ hẹp không đụng tới.",
-    "sourceLink": {
-      "text": "SQLMesh — lookback (định nghĩa chuẩn và bẫy interval_unit)",
-      "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/models/overview/"
-    }
-  },
-  {
-    "id": "c_bitemporality",
-    "subject": "Data Modeling",
-    "term": "48. Bi-temporality — event time và ingestion time",
-    "pronounceOrType": "Chuyện xảy ra lúc nào, và ta biết lúc nào",
-    "definition": "Mỗi dòng dữ liệu có hai mốc thời gian không liên quan nhau: lúc sự kiện xảy ra (event time, thường là updated_at) và lúc ta nhận được nó (ingestion time, thường là ngày của file).\n\nThứ tự file về không phản ánh thứ tự sự kiện. Một file về sau hoàn toàn có thể chứa nội dung cũ hơn — do nguồn gửi lại, do retry, do các hệ thống bên nguồn không đồng bộ với nhau.\n\nHệ quả quan trọng nhất nằm ở phía nghiệp vụ. Một báo cáo chốt tháng trước có thể không sai ở thời điểm chốt, chỉ là lúc đó ta chưa biết hết. Phân biệt được hai chuyện đó mới trả lời được câu 'vì sao doanh thu tháng 6 hôm nay khác con số tháng 6 in ra hồi tháng 7'.\n\nChỉ append log giữ được cả hai mốc. Upsert và refresh ghi đè mất mốc thứ hai — đó là lý do nhiều pipeline vẫn giữ log làm nguồn dù phục vụ người dùng bằng bảng đã dedupe.\n\nLiên hệ với concept 30: SCD Type 2 chính là cách dựng bảng chiều theo đúng ý này, chỉ khác là nó dùng hai cặp valid_from/valid_to cho hai mốc.",
-    "formulaOrSyntax": "-- Sai: xếp hạng theo lúc NHẬN được\nORDER BY _data_date DESC\n-- Đúng: xếp hạng theo lúc sự kiện XẢY RA\nORDER BY updated_at DESC, _data_date ASC\n\n-- Ví dụ thật trong lab, đơn 1510000111:\n--   file ngày 06-02 chứa updated_at = 2026-06-02 00:10:35\n--   file ngày 06-01 chứa updated_at = 2026-06-02 20:27:19\n--   ➔ file về sau nhưng nội dung cũ hơn",
-    "pitfall": "Xếp hạng phiên bản theo ngày của file vì nó dễ nghĩ hơn. Trong lab, cách này chọn nhầm giá trị 435,92 thay vì 230,65 — sai gần gấp đôi, và số dòng không đổi một chút nào.",
-    "sourceLink": {
-      "text": "Martin Fowler — Bitemporal History",
-      "url": "https://martinfowler.com/articles/bitemporal-history.html"
-    }
-  },
-  {
-    "id": "c_content_reconciliation",
-    "subject": "Quality Gate",
-    "term": "49. Đối soát nội dung — đếm dòng là chưa đủ",
-    "pronounceOrType": "EXCEPT hai chiều, hoặc dùng công cụ diff",
-    "definition": "count(*) trả lời câu 'có bao nhiêu dòng', không trả lời câu 'có đúng những dòng đó không'. Hai bảng cùng số dòng vẫn có thể khác nhau hoàn toàn về nội dung.\n\nMuốn chứng minh hai bảng bằng nhau phải so nội dung theo cả hai chiều. Chỉ chạy A EXCEPT B rồi thấy 0 thì mới biết A nằm gọn trong B, chưa biết B có dòng thừa hay không.\n\nTrong cùng một database, EXCEPT hai chiều là đủ. Khi bảng quá lớn hoặc hai bảng nằm ở hai database khác nhau thì EXCEPT không chạy được, lúc đó cần công cụ diff riêng — chúng băm dữ liệu theo từng đoạn rồi chỉ đào sâu vào đoạn nào khác nhau.\n\nDùng lúc nào trong thực tế: so bảng dev với bảng production trước khi merge PR, so nguồn với đích khi chuyển warehouse, so kết quả trước và sau khi sửa logic transform.",
-    "formulaOrSyntax": "-- Trong cùng một database:\nSELECT (SELECT count(*) FROM (SELECT * FROM a EXCEPT SELECT * FROM b)) AS a_minus_b,\n       (SELECT count(*) FROM (SELECT * FROM b EXCEPT SELECT * FROM a)) AS b_minus_a;\n-- cả hai bằng 0 thì hai bảng giống nhau tới từng byte\n\n-- Khi bảng lớn hoặc khác database, dùng package dbt-audit-helper:\n{{ audit_helper.compare_relations(\n     a_relation = ref('orders_old'),\n     b_relation = ref('orders_new'),\n     primary_key = 'order_id') }}\n-- trả về: số dòng chỉ có ở a / chỉ có ở b / khớp cả hai, kèm tỉ lệ phần trăm",
-    "pitfall": "Dừng lại khi thấy count khớp. Trường hợp thật trong lab: count lệch đúng 1 dòng — 0,0002%, không ai để ý — trong khi 5.824 dòng (1,02%) mang giá trị sai hoàn toàn.",
-    "sourceLink": {
-      "text": "dbt-audit-helper — compare_relations / compare_queries",
-      "url": "https://github.com/dbt-labs/dbt-audit-helper"
-    }
-  },
-  {
-    "id": "c_deterministic_tiebreak",
-    "subject": "SQL Fundamentals",
-    "term": "50. Tie-breaker trong ORDER BY",
-    "pronounceOrType": "Hai dòng bằng nhau thì engine chọn dòng nào?",
-    "definition": "Khi hai dòng có cùng giá trị ở cột đầu tiên trong ORDER BY, engine chọn dòng nào là tuỳ nó. Chạy lại lần nữa có thể ra kết quả khác; hai engine khác nhau thì gần như chắc chắn khác. Trạng thái đó gọi là không deterministic.\n\nThêm một cột nữa vào ORDER BY thì kết quả cố định. Cột thêm vào đó gọi là tie-breaker.\n\nNhưng chỉ thêm thôi chưa đủ — nó còn phải khớp với luật mà những chỗ khác trong pipeline đang dùng ngầm. Ví dụ trong lab: view dùng ORDER BY updated_at DESC, _data_date ASC, tức là hoà thì file về trước thắng. MERGE dùng điều kiện dấu >, tức là timestamp bằng nhau thì không update, cũng là file về trước thắng. Hai luật khớp nhau là có chủ ý.\n\nVì sao loại bug này khó tìm: cả hai cách viết đều đúng theo đặc tả, chúng chỉ bất đồng ở trường hợp hoà. Đối soát sẽ báo lệch một dòng, và bạn không có manh mối nào để biết bên nào sai.",
-    "formulaOrSyntax": "row_number() OVER (PARTITION BY id ORDER BY updated_at DESC, _data_date ASC)\n--                                                        └── tie-breaker\n\n-- Kiểm tra xem dữ liệu có trường hợp hoà không, trước khi tin là không có:\nSELECT id, updated_at, count(*) FROM tbl\nGROUP BY 1, 2 HAVING count(*) > 1;",
-    "pitfall": "Bỏ tie-breaker vì 'dữ liệu này không có trùng updated_at'. Ở scale small quả thật không có; ở scale full có đúng một trường hợp — và một trường hợp là đủ để hai cách viết đều đúng cho ra kết quả lệch nhau một dòng.",
-    "sourceLink": {
-      "text": "Use The Index, Luke — Sorting and grouping",
-      "url": "https://use-the-index-luke.com/sql/sorting-grouping"
-    }
-  },
-  {
-    "id": "c_partition_key_not_null",
+    "id": "c_lakehouse_table_formats",
     "subject": "Storage & Pruning",
-    "term": "51. Partition key không bao giờ được NULL",
-    "pronounceOrType": "NULL gặp BETWEEN thì dòng đó biến mất",
-    "definition": "NULL BETWEEN x AND y cho ra NULL chứ không phải TRUE hay FALSE. Dòng có partition key bằng NULL sẽ không lọt qua bất kỳ mệnh đề WHERE nào — nó không được INSERT vào, cũng không bị DELETE ra.\n\nKết quả: mất dòng, không báo lỗi, không cảnh báo. Đây là loại bug tệ nhất vì nó im lặng hoàn toàn cho tới bước đối soát, lúc đó ba chiến lược nạp đột nhiên lệch nhau mà không rõ vì đâu.\n\nNULL thường sinh ra từ bước làm sạch: try_strptime và TRY_CAST trả NULL cho giá trị hỏng thay vì ném lỗi (khoảng 0,02% số dòng trong lab). Đó là hành vi đúng của cleaner, nhưng partition key thì phải có lưới hứng.\n\nChọn giá trị thay thế nào cũng được — ngày của file, ngày của updated_at, hay một giá trị đánh dấu như 1900-01-01 — miễn là chọn một rồi giữ nguyên và ghi vào tài liệu. Giá trị đánh dấu có lợi thế là dễ lọc ra để điều tra sau.",
-    "formulaOrSyntax": "COALESCE(CAST(try_strptime(ts, FORMATS) AS DATE), DATE '{file_date}') AS part_date\n\n-- Kiểm tra lưới đã hứng hết chưa — chạy sau mọi lần nạp:\nSELECT count(*) FILTER (WHERE part_date IS NULL) FROM tbl;   -- phải bằng 0",
-    "pitfall": "Tin rằng ràng buộc NOT NULL sẽ bắt được. Nó bắt được, nếu bạn có đặt. Phần lớn bảng staging không đặt ràng buộc nào, và file Parquet thì không có khái niệm ràng buộc.",
-    "sourceLink": {
-      "text": "DuckDB — NULL semantics (bảng chân trị đầy đủ)",
-      "url": "https://duckdb.org/docs/stable/sql/data_types/nulls"
-    }
+    "term": "36. Từ Swap Thư mục tới Lakehouse Format",
+    "pronounceOrType": "Mở rộng liên kết công nghệ thực tế",
+    "definition": "Cách Swap thư mục vật lý giải quyết được Torn Read nhưng vẫn còn một kẽ hở 4 mili giây giữa 2 lệnh rename, và tốn dung lượng ổ cứng để lưu bản nháp. Sự cồng kềnh này chính là lý do các định dạng bảng hiện đại (Apache Iceberg, Delta Lake) ra đời. Chúng không tráo đổi thư mục vật lý, mà dùng một file con trỏ (metadata pointer) để chỉ định chính xác danh sách file nào đang thuộc phiên bản hiện hành.",
+    "formulaOrSyntax": "-- Triết lý của Iceberg/Delta:\nThay vì chép/rename thư mục, hệ thống tạo file `metadata.json`. Việc công bố dữ liệu mới chỉ là thao tác tráo đổi file con trỏ này thành phiên bản mới nhất.",
+    "pitfall": "Chạy lệnh Swap thư mục giữa 2 ổ đĩa cứng khác nhau. Hệ điều hành sẽ âm thầm biến lệnh rename nhanh gọn thành lệnh Copy + Delete cồng kềnh, kéo dài khoảng hở từ vài mili giây lên hàng chục phút[cite: 11].",
+    "sourceLink": { "text": "Apache Iceberg Specs", "url": "https://iceberg.apache.org/spec/#snapshots" }
   },
   {
-    "id": "c_scale_dependent_correctness",
+    "id": "c_idempotency_checksum",
     "subject": "Reliability & Ops",
-    "term": "52. Lỗi chỉ xuất hiện ở scale lớn",
-    "pronounceOrType": "Viết code ở small, nghiệm thu ở full",
-    "definition": "Có những lỗi logic im lặng hoàn toàn trên dữ liệu nhỏ và chỉ lộ ra ở quy mô thật, vì trường hợp kích hoạt chúng quá hiếm để xuất hiện trong mẫu nhỏ.\n\nChạy đúng trên tập dev không phải là bằng chứng code đúng. Bước chạy full không phải để đo tốc độ — nó là bước kiểm tra tính đúng.\n\nHai ví dụ trong lab, cùng một bản chất. Một là dedupe trong phạm vi cửa sổ thay vì dedupe toàn bộ rồi mới lọc: ở small hai cách cho kết quả giống hệt, ở full cách sai để lại 7 dòng trùng. Hai là thiếu tie-breaker: ở small không có trường hợp hoà nào, ở full có đúng một.\n\nCách phòng: khi làm tập dev, đừng chỉ lấy mẫu nhỏ hơn một cách ngẫu nhiên. Phải cố ý nhét vào đó các trường hợp biên đã biết — giá trị hoà, dữ liệu về trễ, giá trị NULL, khoá trùng. Không thì tập dev chỉ đang xác nhận rằng đường đi thuận lợi vẫn chạy được.",
-    "formulaOrSyntax": "-- Đúng: dedupe TOÀN BỘ trước, rồi mới lọc theo cửa sổ\nSELECT * FROM (SELECT *, row_number() OVER (...) rn\n               FROM log WHERE _data_date <= D)\nWHERE rn = 1 AND part_date BETWEEN lo AND D;\n\n-- Sai, nhưng small không phát hiện ra: lọc cửa sổ trước rồi mới dedupe\nSELECT * FROM (SELECT *, row_number() OVER (...) rn\n               FROM log WHERE part_date BETWEEN lo AND D)\nWHERE rn = 1;\n-- bản mới nhất của một đơn có thể nằm NGOÀI cửa sổ ➔ dedupe cục bộ chọn nhầm bản cũ",
-    "pitfall": "Thấy tất cả test đều xanh trên tập dev rồi deploy. Trong lab, cách viết sai cho kết quả giống hệt cách đúng ở scale small — không chạy full thì lỗi đó lên thẳng production.",
-    "sourceLink": {
-      "text": "Maxime Beauchemin — Functional Data Engineering",
-      "url": "https://maximebeauchemin.medium.com/functional-data-engineering-a-modern-paradigm-for-batch-data-processing-2327ec32c42a"
-    }
+    "term": "37. Chạy lại an toàn (Idempotency) & Order-independent Checksum",
+    "pronounceOrType": "Trạng thái bất biến khi phục hồi hệ thống",
+    "definition": "Hệ thống sập, muốn chạy lại tự động thì pipeline phải có khả năng bảo toàn trạng thái (chạy 1 lần hay 10 lần kết quả cuối cùng không đổi). Đạt được nhờ việc bọc lệnh Xóa và Ghi vào chung 1 Giao dịch (Transaction). Để chứng minh, dùng hàm `bit_xor` sinh checksum: nó gom các mã băm lại mà không bị phụ thuộc vào việc engine đọc dòng nào trước dòng nào sau.",
+    "formulaOrSyntax": "BEGIN;\n  DELETE FROM tbl WHERE data_date = D;\n  INSERT INTO tbl ...;\nCOMMIT;\n-- Đo checksum độc lập thứ tự:\nbit_xor(hash(order_id, updated_at, status, order_total))",
+    "pitfall": "Dùng lệnh `INSERT` trần thả rông. Khi hệ thống đứt gánh giữa đường, scheduler chạy lại sẽ vô tư nhét thêm dữ liệu, làm nhân đôi toàn bộ doanh thu của ngày hôm đó[cite: 9].",
+    "sourceLink": { "text": "DuckDB Transactions", "url": "https://duckdb.org/docs/stable/sql/statements/transactions" }
   },
   {
-    "id": "c_restatement_semantics",
+    "id": "c_orchestration_fault_isolation",
     "subject": "Reliability & Ops",
-    "term": "53. Chạy lại partition cũ chính là backfill",
-    "pronounceOrType": "Refresh chỉ idempotent ở partition mới nhất",
-    "definition": "Partition refresh chỉ cho kết quả không đổi khi bạn chạy lại ngày mới nhất. Chạy lại một ngày D cũ hơn sẽ đưa cửa sổ [D−N, D] về đúng trạng thái tại thời điểm D, tức là xoá mất mọi bản sửa đã về sau ngày đó.\n\nVì vậy 'chạy lại một ngày' và 'backfill' không phải hai việc khác nhau. Chạy lại một ngày trong quá khứ chính là một lần backfill nhỏ, và phải chạy tiếp từ D tới hiện tại thì kết quả mới đúng.\n\nĐiều kiện _data_date <= D là thứ làm cho việc tái hiện quá khứ trung thực. Trong pipeline chạy thật nó tự đúng vì lúc đó chưa có file D+1; khi replay lại lịch sử thì phải tự viết ra.\n\nFramework tách rõ hai khái niệm này: SQLMesh phân biệt lookback (chỉ mở rộng phạm vi dữ liệu ĐỌC ở mỗi lần chạy) với restatement (ghi LẠI dữ liệu đã xử lý trước đó). Nhầm hai cái là nguồn của rất nhiều sự cố mất dữ liệu.",
-    "formulaOrSyntax": "-- Điều kiện as-of, để tái hiện đúng những gì pipeline thấy vào ngày D:\nWHERE _data_date <= DATE '{D}'\n\n-- Chạy lại ĐÚNG (cuốn tới hiện tại):\nfor d in date_range(D, today): refresh(d)\n\n-- Chạy lại SAI (xoá mọi bản sửa về sau D, không báo lỗi):\nrefresh(D)\n\n-- SQLMesh có lệnh riêng cho việc này:\nsqlmesh plan --restate-model db.orders --start 2026-06-01 --end 2026-06-10",
-    "pitfall": "Chạy lại một ngày lẻ trong quá khứ để 'sửa nhanh'. Nó âm thầm xoá mọi bản sửa đã về sau ngày đó, và bạn chỉ biết khi có người hỏi vì sao con số tháng trước đổi.",
-    "sourceLink": {
-      "text": "SQLMesh — Plans & restatement (phân biệt lookback với restate)",
-      "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/plans/"
-    }
+    "term": "38. Orchestration & Ranh giới cô lập lỗi (Fault Isolation)",
+    "pronounceOrType": "Tư duy điều phối DAG: Lỗi mẻ nào khoanh vùng mẻ đó",
+    "definition": "Khi chạy tự động nạp lại lịch sử 69 ngày, nếu ngày 22 gặp file hỏng, hệ thống phải biết đánh dấu 'failed' vào sổ trạng thái rồi tiếp tục đi nạp ngày 23. Đây là ranh giới cô lập lỗi, cũng là sự khác biệt cốt lõi giữa việc viết một vòng lặp FOR ngây thơ và dùng một hệ điều phối (Orchestrator như Airflow/Dagster). Đi kèm là luật Retry: Lỗi mạng chập chờn thì thử lại giãn cách; lỗi sai schema thì chết ngay lập tức.",
+    "formulaOrSyntax": "-- Cốt lõi của Orchestrator:\n1. Dependency (Chờ bước A xong mới làm bước B)\n2. Fault Isolation (Ngày 22 hỏng không làm sập ngày 23)\n3. Retry Backoff (Lỗi mạng thì thử lại, lỗi dữ liệu thì sập luôn)",
+    "pitfall": "Bọc `except Exception` rồi nhắm mắt retry mọi thứ. Việc thử lại một file hỏng schema 10 lần chỉ làm tắc nghẽn server, làm mệt hệ thống và chôn vùi mất dòng thông báo lỗi thật sự[cite: 7, 9].",
+    "sourceLink": { "text": "Airflow Core Concepts", "url": "https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/index.html" }
   },
   {
-    "id": "c_torn_read_window",
+    "id": "c_validate_validator",
     "subject": "Reliability & Ops",
-    "term": "54. Torn read — đọc trúng lúc dữ liệu đang được ghi lại",
-    "pronounceOrType": "Chế độ hỏng khi cập nhật dữ liệu đang phục vụ",
-    "definition": "Khi bạn cập nhật một phần dữ liệu bằng cách xoá bản cũ rồi ghi bản mới, thao tác đó thực ra gồm hai bước tách rời nhau. Trong quãng thời gian giữa hai bước, ai lỡ đọc vào sẽ nhận được một kết quả sai: có thể thiếu dòng, có thể trùng dòng, cũng có thể là lỗi không mở được file vì file vừa biến mất. Người ta gọi lần đọc rơi trúng trạng thái dở dang đó là torn read. Điều đáng ngại là nó không báo gì cho người đọc, mà trả về một con số trông hoàn toàn bình thường.",
-    "formulaOrSyntax": "-- Cách cập nhật tại chỗ, và quãng thời gian nguy hiểm của nó:\nDELETE FROM <partition>;        -- bước 1\nCOPY (...) TO '<partition>';    -- bước 2\n-- quãng giữa hai bước chính là cửa sổ torn read\n\n-- Độ dài quãng đó bằng thời gian GHI dữ liệu, nên nó lớn dần theo khối lượng.\n-- Số đo khi ghi lại một ngày dữ liệu đơn hàng:\n--   180 nghìn dòng : mất 1,9 giây\n--   3,6 triệu dòng : mất 28,7 giây",
-    "pitfall": "Đừng đánh giá một cách cập nhật bằng việc job có chạy xong hay không, mà bằng việc người đọc nhìn thấy gì trong lúc nó chạy. Một job kết thúc bình thường nhưng làm dashboard hiện ra số 0 thì vẫn là một lần hỏng. Trong ba thứ người đọc có thể gặp, lỗi mở file lại là thứ ít nguy hiểm nhất, vì nó làm job báo đỏ và có người vào sửa; còn một kết quả bằng 0 thì đi thẳng vào báo cáo mà không ai nghi ngờ gì.",
-    "sourceLink": {
-      "text": "Delta Lake protocol — tính atomic của một lần commit",
-      "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
-    }
-  },
-  {
-    "id": "c_publish_by_rename",
-    "subject": "Reliability & Ops",
-    "term": "55. Publish bằng rename — dựng ở chỗ khuất rồi đổi tên vào chỗ",
-    "pronounceOrType": "Khuôn công bố dữ liệu mới",
-    "definition": "Nguyên tắc là đừng sửa thứ mà người đọc đang nhìn vào. Bạn dựng phiên bản mới ở một thư mục riêng mà người đọc không quét tới, xong xuôi rồi mới đổi tên thư mục đó vào đúng vị trí. Sở dĩ cách này ăn thua là vì lệnh rename không chuyển đi byte dữ liệu nào; hệ điều hành chỉ sửa lại mục ghi tên trong bảng thư mục, nên thư mục lớn tới đâu thì lệnh đó cũng chỉ mất chừng ấy thời gian.",
-    "formulaOrSyntax": "-- Phần chậm diễn ra ở chỗ không ai thấy:\ndựng bản mới  ->  lake/.staging/<partition>\n\n-- Phần công bố gồm hai lệnh đổi tên:\nlệnh 1: lake/orders/<partition>    ->  lake/.trash/<partition>.<timestamp>\nlệnh 2: lake/.staging/<partition>  ->  lake/orders/<partition>\n\n-- Số đo trên cùng một ngày dữ liệu: dựng lại mất 1,3 giây,\n-- còn phần công bố mất khoảng 4 phần nghìn giây.",
-    "pitfall": "Thay một thư mục đang phục vụ thì cần tới hai lệnh đổi tên, nên cách này chỉ gần như tức thì chứ chưa phải atomic. Giữa hai lệnh đó, thư mục dữ liệu không tồn tại. Có thể kiểm chứng bằng cách cố tình chèn một khoảng nghỉ hai giây vào giữa: người đọc sẽ nhận số 0 trong đúng hai giây ấy. Nếu bạn gọi cách này là atomic thì lần crash đầu tiên sẽ đính chính lại. Còn một điều kiện nữa: thư mục staging và thư mục rác phải nằm cùng ổ đĩa với dữ liệu, vì khác ổ thì hệ điều hành lặng lẽ biến lệnh đổi tên thành chép rồi xoá, mất hàng chục giây và không còn tức thì nữa.",
-    "sourceLink": {
-      "text": "Apache Iceberg — cơ chế snapshot",
-      "url": "https://iceberg.apache.org/spec/#snapshots"
-    }
-  },
-  {
-    "id": "c_staging_outside_glob",
-    "subject": "Storage & Pruning",
-    "term": "56. Thư mục tạm phải nằm ngoài phạm vi quét của người đọc",
-    "pronounceOrType": "Cách bố trí thư mục trong data lake",
-    "definition": "Khi người đọc lấy dữ liệu bằng một mẫu đường dẫn, chẳng hạn quét mọi file parquet nằm trong orders, thì bất kỳ thư mục nào bạn tạo thêm bên trong orders cũng bị gộp vào kết quả. Vì vậy thư mục tạm phải đặt ngang hàng với thư mục dữ liệu, chứ không đặt bên trong nó.",
-    "formulaOrSyntax": "-- Bố trí đúng: thư mục tạm là anh em, không phải con\nlake/\n  orders/     <- người đọc quét theo mẫu 'orders/*/*.parquet'\n  .staging/   <- nằm ngoài mẫu đó\n  .trash/     <- nằm ngoài mẫu đó\n\n-- Bố trí sai: bản sao tạm nằm ngay trong orders/\nlake/orders/order_date=2026-06-19\nlake/orders/order_date=2026-06-19.__tmp__   <- vẫn bị quét vào,\n                                            -- số dòng đọc ra gấp đôi thực tế",
-    "pitfall": "Chỗ này hỏng vì hai lẽ cộng lại, và cả hai đều im lặng. Thứ nhất, dấu sao trong mẫu đường dẫn không kiểm tra tên thư mục, nên bản sao tạm bị vơ vào. Thứ hai, khi lọc theo ngày thì DuckDB đọc chuỗi 2026-06-19 ở đầu tên thư mục rồi dừng, phần đuôi phía sau bị bỏ qua, nên bản sao tạm vẫn khớp điều kiện lọc như thường. Kết quả là dữ liệu bị đếm hai lần, trong khi không có tiến trình nào đang ghi và không có lỗi nào được báo. Đổi tên thư mục tạm thành dạng có dấu chấm ở đầu cũng không cứu được, vì dấu chấm đầu tên chỉ giấu thư mục khỏi lệnh liệt kê trên Linux, còn mẫu đường dẫn thì vẫn khớp.",
-    "sourceLink": {
-      "text": "DuckDB — Hive partitioning",
-      "url": "https://duckdb.org/docs/stable/data/partitioning/hive_partitioning"
-    }
-  },
-  {
-    "id": "c_retry_on_read",
-    "subject": "Reliability & Ops",
-    "term": "57. Retry-on-read — coi kết quả rỗng là tín hiệu đọc lại",
-    "pronounceOrType": "Phòng thủ ở phía người đọc",
-    "definition": "Nếu bạn biết chắc phần dữ liệu mình hỏi tới vốn dĩ có số liệu, thì một kết quả rỗng hoặc một lỗi không mở được file nhiều khả năng nghĩa là dữ liệu đang được thay giữa chừng. Trong trường hợp đó, phía đọc nên chờ một nhịp rồi hỏi lại, thay vì trả ngay số 0 cho người dùng. Cách làm phổ biến là thử lại vài lần, mỗi lần cách nhau một khoảng ngắn.",
-    "formulaOrSyntax": "def read_with_retry(attempts=15, wait=0.3):\n    for _ in range(attempts):\n        try:\n            n = read_once()\n            if n > 0:\n                return n          # có số liệu thì trả về luôn\n        except IOError:\n            pass                  # file biến mất giữa lúc quét\n        time.sleep(wait)          # chờ một nhịp rồi hỏi lại\n    raise RuntimeError('dữ liệu vẫn rỗng sau khi đã thử lại')",
-    "pitfall": "Cách này chỉ dùng được khi bạn biết trước dữ liệu phải có; với một ngày thật sự không phát sinh đơn hàng nào thì số 0 là câu trả lời đúng, và việc thử lại chỉ làm chậm. Quan trọng hơn, phía đọc và phía ghi phải cùng làm phần của mình. Nếu phía ghi vẫn cập nhật tại chỗ và mất gần nửa phút, thì vòng thử lại kéo dài vài giây sẽ hết lượt trước khi dữ liệu kịp xuất hiện, và vẫn trả về số 0. Ngược lại, nếu phía ghi đã rút quãng nguy hiểm xuống vài phần nghìn giây mà phía đọc không thử lại, thì xác suất trúng tuy nhỏ vẫn cộng dồn theo số lần đọc và số lần cập nhật mỗi ngày, và khi trúng thì người đọc không có cách nào biết mình đang cầm số sai.",
-    "sourceLink": {
-      "text": "Google SRE Book — retry và xử lý quá tải",
-      "url": "https://sre.google/sre-book/handling-overload/"
-    }
-  },
-  {
-    "id": "c_crash_safe_invariant",
-    "subject": "Reliability & Ops",
-    "term": "58. An toàn khi crash đến từ việc luôn còn một bản đầy đủ",
-    "pronounceOrType": "Tính chất bất biến của thao tác công bố dữ liệu",
-    "definition": "Một thao tác không trở nên an toàn chỉ vì nó chạy nhanh hơn. Cái làm nó an toàn là ở mọi thời điểm, kể cả lúc tiến trình bị giết đột ngột, vẫn luôn có ít nhất một nơi đang giữ một bản dữ liệu đầy đủ. Giữ được tính chất đó thì mới viết được một hàm khôi phục đáng tin, vì hàm đó chỉ cần đi tìm xem bản đầy đủ hiện đang nằm ở đâu.",
-    "formulaOrSyntax": "-- Nếu tiến trình chết ngay sau lệnh đổi tên thứ nhất:\nthư mục dữ liệu chính  ->  không tồn tại\nthư mục staging        ->  bản MỚI, đầy đủ\nthư mục rác            ->  bản CŨ, đầy đủ\n\n-- Hàm khôi phục xét theo thứ tự:\n1. dữ liệu chính đã có chưa\n2. staging còn không     -> đưa vào, vì đây là bản mới hơn\n3. thư mục rác còn không -> đưa lại bản cũ",
-    "pitfall": "Cần nói rõ một điều: sau khi crash thì dữ liệu biến mất và nó không tự trở lại, phải có người chạy khôi phục. Khi diễn tập chuyện này, hãy giết tiến trình theo cách không cho nó dọn dẹp gì cả, vì chỉ như vậy mới giống một lần mất điện thật; thoát chương trình theo cách thông thường thì các đoạn dọn dẹp vẫn chạy và bạn không thấy được tình huống xấu nhất. Riêng trên Windows còn một chuyện nữa: lệnh đổi tên sẽ báo lỗi thiếu quyền nếu có bất kỳ tiến trình nào đang mở file bên trong thư mục, kể cả một người đọc đang quét dở hay phần mềm quét virus, nên phía ghi cần một vòng thử lại ngắn. Không có vòng đó thì lỗi đầu tiên sẽ giết script đúng vào lúc tệ nhất, là khi bản cũ đã bị dời đi mà bản mới chưa được đưa vào.",
-    "sourceLink": {
-      "text": "Python — os.replace và os._exit",
-      "url": "https://docs.python.org/3/library/os.html#os.replace"
-    }
-  },
-  {
-    "id": "c_catalog_swap",
-    "subject": "SQL & Engine",
-    "term": "59. Đổi tên bảng trong một transaction",
-    "pronounceOrType": "Cách công bố dữ liệu ở tầng warehouse",
-    "definition": "Bên trong một database thì không cần tới mấy mẹo đổi tên thư mục, vì database có sẵn một cuốn sổ ghi tên nào đang trỏ tới dữ liệu nào, gọi là catalog. Bạn dựng bảng thay thế dưới một tên tạm, rồi đổi tên hai bảng cho nhau trong cùng một transaction. Vì cuốn sổ đó nằm trong transaction nên hai lần đổi tên hoặc cùng hiện ra, hoặc cùng không hiện ra, và người đọc không bao giờ rơi vào khoảng giữa.",
-    "formulaOrSyntax": "BEGIN;\n  ALTER TABLE orders     RENAME TO orders_old;\n  ALTER TABLE orders_new RENAME TO orders;\nCOMMIT;\n\n-- Một phiên khác đếm số dòng trong lúc transaction đang chạy:\n--   trước COMMIT : thấy bảng CŨ, đầy đủ và đúng\n--   sau  COMMIT  : thấy bảng mới\n-- Không có thời điểm nào nó thấy bảng rỗng hay thấy nửa nọ nửa kia.",
-    "pitfall": "Cách này có hai giới hạn cần nói ra thay vì để người dùng tự phát hiện. Thứ nhất, nó chỉ bảo vệ những phiên đang kết nối vào chính database đó; một tiến trình khác thậm chí còn không mở nổi file database khi tiến trình ghi đang giữ, vì phần lớn database nhúng chỉ cho một người ghi tại một thời điểm. Thứ hai, nó không giúp được gì cho những ai đọc thẳng file parquet ngoài lake, bởi những file đó nằm ngoài catalog. Đây cũng là lý do bên lake phải chấp nhận một khoảng hở còn bên database thì không: hệ thống file không có cuốn sổ nào bao trùm được hai lệnh đổi tên thư mục.",
-    "sourceLink": {
-      "text": "DuckDB — ALTER TABLE và RENAME",
-      "url": "https://duckdb.org/docs/stable/sql/statements/alter_table"
-    }
-  },
-  {
-    "id": "c_versioned_dir_view",
-    "subject": "Storage & Pruning",
-    "term": "60. Thư mục có đánh version và view trỏ sang bản mới",
-    "pronounceOrType": "Cách công bố dữ liệu ở tầng lake",
-    "definition": "Ý tưởng là không bao giờ sửa một thư mục đã công bố. Mỗi lần cần ghi lại, bạn tạo hẳn một thư mục version mới, dựng dữ liệu trong đó cho xong, rồi tạo lại view để nó trỏ sang thư mục mới. Người dùng luôn truy vấn qua tên view chứ không bao giờ gõ thẳng đường dẫn thư mục. Nhờ vậy việc chuyển sang bản mới chỉ là sửa một dòng trong catalog; muốn quay lui thì trỏ view về thư mục cũ là xong, không phải khôi phục dữ liệu từ đâu cả. Đọc lại thư mục cũ cũng chính là cách trả lời câu hỏi hôm qua dữ liệu trông thế nào.",
-    "formulaOrSyntax": "lake/orders_v=<version cũ>/    <- view đang trỏ vào đây, người đọc vẫn dùng bình thường\nlake/orders_v=<version mới>/  <- dựng lại ở đây, chưa ai đọc nên sửa thoải mái\n\nCREATE OR REPLACE VIEW core.lake_orders AS\nSELECT * EXCLUDE (orders_v)\nFROM read_parquet('lake/orders_v=<version mới>/*/*.parquet',\n                  hive_partitioning=true);",
-    "pitfall": "Cái phải trả là dung lượng đĩa. Nếu bạn tạo version mới bằng cách chép cả cây thư mục thì toàn bộ lake bị nhân đôi, trong khi thường chỉ một phần rất nhỏ thực sự thay đổi. Trên tập dữ liệu nhỏ, thao tác chép còn nhanh hơn cả việc dựng lại nên chi phí này không lộ ra; tới khi dữ liệu lớn gấp vài chục lần thì mỗi lần chép mất hàng chục giây, vẫn chỉ để thay đúng một phần nhỏ. Iceberg và Delta Lake giữ nguyên ý tưởng con trỏ version nhưng ghi danh sách từng file vào metadata, nhờ đó version sau dùng lại được mọi file không đổi và chỉ phần thật sự ghi lại mới chiếm thêm chỗ.",
-    "sourceLink": {
-      "text": "Apache Iceberg — cơ chế snapshot",
-      "url": "https://iceberg.apache.org/spec/#snapshots"
-    }
-  },
-  {
-    "id": "c_version_retention",
-    "subject": "Reliability & Ops",
-    "term": "61. Giữ lại bao nhiêu bản cũ — chính sách retention",
-    "pronounceOrType": "Việc vận hành phải chạy định kỳ",
-    "definition": "Mọi cách công bố dữ liệu an toàn đều dựa trên việc giữ lại bản cũ thêm một thời gian, vì đó là thứ cho phép quay lui. Nhưng giữ lại thì tốn chỗ, và mỗi lần ghi lại một phần dữ liệu là thêm một bản đầy đủ nữa nằm trên đĩa. Vì vậy phải có một chính sách nói rõ giữ bao nhiêu và giữ bao lâu, chẳng hạn giữ N bản gần nhất, hoặc xoá những bản cũ hơn X ngày.",
-    "formulaOrSyntax": "-- Cùng một câu hỏi, đặt ra ở hai chỗ:\nlake/.trash/<partition>.<timestamp>   -> giữ mấy thế hệ?\nlake/orders_v=<version>/              -> giữ mấy version?\n\n-- Chính sách thường gặp:\n--   giữ N bản gần nhất, xoá phần còn lại\n--   hoặc xoá mọi bản cũ hơn X ngày",
-    "pitfall": "Đừng xoá bản cũ ngay tại thời điểm công bố bản mới, vì làm vậy là tự cắt mất đường quay lui đúng lúc rủi ro cao nhất. Nhưng cũng đừng để đó rồi quên, vì thư mục rác chỉ lớn dần chứ không tự co lại. Chi phí đĩa cho việc giữ vài bản cũ vẫn nhỏ hơn nhiều so với việc dựng lại dữ liệu từ đầu lúc hai giờ sáng. Iceberg gọi việc dọn này là expire snapshots, và cần nhớ rằng đó là công việc bạn phải chủ động lên lịch, không có gì tự chạy hộ.",
-    "sourceLink": {
-      "text": "Apache Iceberg — expire snapshots và bảo trì bảng",
-      "url": "https://iceberg.apache.org/docs/latest/maintenance/"
-    }
-  },
-    {
-    "id": "c_schema_evolution_era",
-    "subject": "Pipeline Lifecycle",
-    "term": "62. Schema evolution — lịch sử không được viết lại theo",
-    "pronounceOrType": "Dữ liệu vào đổi hình dạng giữa chừng",
-    "definition": "Sớm muộn gì bên cung cấp dữ liệu cũng đổi cấu trúc file họ gửi. Chỗ nhiều người nhầm là tưởng đây giống một lần nâng cấp: đổi xong thì mọi thứ về lại một mối. Thực tế thì phần dữ liệu bạn đã nhận trước đó chẳng ai viết lại cho, nên từ ngày đó trở đi pipeline phải đọc được nhiều hình dạng cùng một lúc, và chuyện đó kéo dài mãi về sau. Mỗi khoảng ngày mà cấu trúc giữ nguyên được gọi là một era, và bạn sẽ mang theo tất cả các era chứ không chỉ era mới nhất.",
-    "formulaOrSyntax": "-- Muốn biết cấu trúc đã đổi vào ngày nào, hãy gom các file theo dòng header:\nfor f in sorted(raw_dir.glob('orders_*.csv')):\n    header = open(f, encoding='utf-8').readline().strip()\n    sigs.setdefault(header, []).append(f.name)\n\n-- Một feed 69 file có thể gom lại thành đúng ba nhóm header,\n-- và ranh giới giữa các nhóm chính là ngày bên cung cấp đổi cấu trúc.",
-    "pitfall": "Đừng dò bằng kiểu dữ liệu mà engine tự đoán ra. Kiểu đoán ra dao động giữa file này với file kia vì những lý do chẳng liên quan gì tới cấu trúc, chẳng hạn một ngày mà cột nào đó tình cờ không có giá trị rỗng sẽ được đoán khác với ngày có. Dòng header thì chỉ là một dòng, đọc chẳng tốn gì, và nó chỉ đổi khi bên cung cấp thật sự đổi nó.",
-    "sourceLink": {
-      "text": "Apache Iceberg — quy tắc schema evolution",
-      "url": "https://iceberg.apache.org/spec/#schema-evolution"
-    }
-  },
-  {
-    "id": "c_silent_schema_change",
-    "subject": "Quality Gate",
-    "term": "63. Thay đổi làm chương trình chết là thay đổi dễ chịu nhất",
-    "pronounceOrType": "Xếp loại mức nguy hiểm của một thay đổi",
-    "definition": "Khi dữ liệu nguồn đổi, có loại làm chương trình dừng lại kèm thông báo lỗi, và có loại nạp vào dữ liệu sai rồi báo là thành công. Loại thứ nhất tuy phiền nhưng thật ra là món quà, vì nó dừng pipeline và trong vài phút bạn đã có manh mối. Loại thứ hai mới đáng sợ, và nó chiếm phần lớn: trong một đợt thay đổi thật, sáu trên bảy thay đổi thuộc loại im lặng. Đỉnh điểm của loại im lặng là khi bên cung cấp giữ nguyên tên cột, kiểu dữ liệu và quy định cho phép rỗng, mà chỉ đổi ý nghĩa của con số bên trong.",
-    "formulaOrSyntax": "-- Trước:  order_total là tổng tiền các mặt hàng\n-- Sau:    order_total là tổng tiền các mặt hàng đã trừ giảm giá\n\n-- Còn schema thì giống hệt nhau ở cả hai thời kỳ:\n--   order_total  DECIMAL(14,2)  NOT NULL\n-- Một cổng kiểm dựa trên schema không có gì để mà bắt.",
-    "pitfall": "Đổi tên hay đổi kiểu ít ra còn để lại dấu vết, vì có một cột biến mất hoặc một phép join không khớp, đem schema ra đối chiếu là thấy. Còn đổi ý nghĩa thì không dòng code nào phải sửa, mọi bên tiêu thụ vẫn chạy trơn tru, vẫn ra số, và số đó sai ở mọi đơn có giảm giá. Nó chỉ lộ ra khi có người phát hiện báo cáo tài chính lệch, thường là vài tuần sau. Cũng vì thế, điều khoản quản lý thay đổi trong contract nên xếp việc đổi ý nghĩa ngang hàng với đổi kiểu; nếu điều khoản chỉ liệt kê đổi tên, xoá cột và đổi kiểu thì bên cung cấp hoàn toàn có thể lập luận rằng họ chẳng vi phạm gì.",
-    "sourceLink": {
-      "text": "Data Contract Specification — phân loại mức độ thay đổi",
-      "url": "https://datacontract.com/"
-    }
-  },
-  {
-    "id": "c_canonical_schema",
-    "subject": "Data Modeling",
-    "term": "64. Canonical schema — dịch một lần ở cửa, phía sau khỏi biết",
-    "pronounceOrType": "Cách gộp nhiều era về một hình dạng",
-    "definition": "Khi đã có nhiều era, câu hỏi là ai sẽ chịu phần việc dịch chúng về một mối. Nếu không ai chịu thì mọi bên tiêu thụ đều phải tự xoay xở, và mỗi người sẽ xoay một kiểu. Cách gọn hơn là định nghĩa đúng một schema đích rồi đặt ngay ở cửa vào một lớp dịch mỏng cho từng era. Nhờ vậy mọi thứ phía sau chỉ nhìn thấy một hình dạng duy nhất và không bao giờ phải biết một dòng đến từ era nào.",
-    "formulaOrSyntax": "file era v1 -+\nfile era v2 -+-> lớp dịch riêng từng era -> lớp làm sạch dùng chung -> schema đích\nfile era v3 -+    (đổi tên, dựng khoá,       (không biết gì về era)\n                   thêm cột còn thiếu)\n\n-- Kiến thức về era nằm đúng ở một chỗ.\n-- Có thêm era thứ tư thì chỉ tốn thêm một lớp dịch, phía sau không phải sửa gì.",
-    "pitfall": "Hãy tách lớp dịch schema ra khỏi lớp làm sạch giá trị, đừng gộp thành mỗi era một câu lệnh làm tất cả. Gộp lại thì các quy tắc làm sạch bị chép thành nhiều bản, và tới lúc sửa một định dạng ngày tháng thì bạn sửa được hai chỗ rồi quên chỗ thứ ba, mà chính bản bị quên sẽ gây ra sự cố. Một điểm nữa dễ làm ngược: khi đổi tên, hãy ánh xạ về cái tên mà phần lịch sử và các bảng phía sau đang dùng, chứ đừng đổi lịch sử cho khớp với era mới nhất, vì làm vậy là phải sửa mọi thứ phía sau trong khi cả mục đích của cách làm này là để phía sau không phải nhúc nhích.",
-    "sourceLink": {
-      "text": "SQLMesh — model kinds và contract ở mức cột",
-      "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/models/model_kinds/"
-    }
-  },
-  {
-    "id": "c_backfill_default",
-    "subject": "Cleansing",
-    "term": "65. Chỗ thiếu đã biết thì điền, không biết mới để rỗng",
-    "pronounceOrType": "Quy tắc khi thêm cột cho dữ liệu cũ",
-    "definition": "Khi dữ liệu cũ không có một cột mà schema đích yêu cầu, bạn phải quyết cho từng cột một: giá trị đang thiếu đó là thứ bạn biết chắc, hay là thứ không ai từng ghi lại? Biết chắc thì điền giá trị thật vào; không biết thì để rỗng. Nghe thì giống nhau, nhưng hậu quả của hai lựa chọn ngược hẳn nhau, và đây là chỗ quyết định xem các phép đối soát của bạn về sau có dùng được trên toàn bộ lịch sử hay không.",
-    "formulaOrSyntax": "-- Cùng một thời kỳ dữ liệu cũ, bốn cột nhưng hai cách xử lý:\ncurrency        -> 'USD'   -- biết chắc: thời kỳ đó chỉ dùng một loại tiền tệ\ndiscount_amount -> 0       -- biết chắc: khi đó chưa có cơ chế giảm giá\nchannel         -> NULL    -- không biết: không ai từng đo\nloyalty_tier    -> NULL    -- không biết",
-    "pitfall": "Điền số 0 vào cột giảm giá của dữ liệu cũ chính là thứ khiến một công thức đối soát viết cho thời kỳ mới vẫn đúng trên toàn bộ lịch sử, đo được khoảng 99,4% ở cả ba thời kỳ. Nếu để rỗng thì phép trừ ra rỗng, mọi so sánh sau đó cũng ra rỗng, và toàn bộ dữ liệu cũ lặng lẽ rơi ra khỏi phép kiểm; cột đếm số dòng đạt sẽ ra 0 mà không lỗi nào báo. Ở chiều ngược lại, tự chọn đại một giá trị cho cột chưa ai từng ghi thì đó là bịa dữ liệu, và cái sai này còn khó gỡ hơn vì nó trông y như dữ liệu thật.",
-    "sourceLink": {
-      "text": "Delta Lake protocol — cập nhật schema tự động",
-      "url": "https://docs.delta.io/latest/delta-batch.html#automatic-schema-update"
-    }
-  },
-  {
-    "id": "c_positional_column_mapping",
-    "subject": "SQL & Engine",
-    "term": "66. Khai schema tường minh thì khớp theo vị trí, không theo tên",
-    "pronounceOrType": "Cách engine đọc file có schema khai sẵn",
-    "definition": "Khai sẵn danh sách cột khi đọc CSV là cách phòng thân đúng đắn, vì nó chặn được chuyện engine tự đoán sai kiểu. Nhưng nó có một mặt trái ít người biết: engine gán tên theo đúng thứ tự bạn viết ra, còn dòng header trong file thì chỉ bị bỏ qua chứ không hề được đem ra đối chiếu. Nghĩa là nếu bên cung cấp đổi thứ tự cột mà bạn vẫn khai theo thứ tự cũ, giá trị sẽ rơi vào sai cột.",
-    "formulaOrSyntax": "read_csv(path, header=true, columns=COLS)\n-- COLS gán tên theo VỊ TRÍ; dòng header chỉ bị bỏ qua\n\n-- Bên cung cấp đẩy cột mã tiền tệ lên trước cột chứa JSON.\n-- Khai theo thứ tự cũ thì chuỗi 'USD' được nạp vào cột JSON,\n-- và không lỗi nào được ném ra, vì cả hai cột đều là kiểu chuỗi.",
-    "pitfall": "Loader sẽ không giúp bạn phát hiện chuyện này, bởi nó chẳng có gì để phàn nàn: mọi cột đều là chuỗi và mọi giá trị đều vừa chỗ. Cách duy nhất là tự nhìn. Mỗi lần khai một schema mới, hãy đọc thử vài dòng rồi kiểm tay hai giá trị, chẳng hạn cột chứa JSON có còn giống JSON không và cột mã tiền tệ có còn giống mã tiền tệ không. Việc đó mất vài giây và chỉ phải làm một lần cho mỗi era mới.",
-    "sourceLink": {
-      "text": "DuckDB — tham số columns của read_csv",
-      "url": "https://duckdb.org/docs/stable/data/csv/overview"
-    }
-  },
-  {
-    "id": "c_key_ladder",
-    "subject": "Data Modeling",
-    "term": "67. Khoá của bên cung cấp có thể đổi kiểu ngay dưới chân bạn",
-    "pronounceOrType": "Ba nấc lựa chọn cho khoá chính",
-    "definition": "Khoá đi kèm dữ liệu và do bên cung cấp sinh ra thì có ý nghĩa sẵn, không tốn gì của bạn, nhưng nằm ngoài tầm kiểm soát. Tới ngày họ đổi nó từ số sang chuỗi có tiền tố, mọi bản sửa họ gửi về cho các đơn cũ đều trượt, bởi một chuỗi không bao giờ bằng một con số trong phép join. Từ đó có ba nấc lựa chọn: dùng thẳng khoá của họ, canonical hoá để bạn nắm phần định dạng còn họ giữ phần ý nghĩa, hoặc tự sinh khoá của riêng mình và giữ khoá gốc như một thuộc tính thường.",
-    "formulaOrSyntax": "-- Đo trên một file mang 705 bản sửa cho các đơn cũ:\n\n-- join theo khoá thô, không chuẩn hoá\nON v.order_id = CAST(h.order_id_num AS VARCHAR)     -->     0 / 705\n\n-- join sau khi cắt tiền tố và đưa về cùng một kiểu\nON CAST(replace(v.order_id,'ORD-','') AS BIGINT) = h.order_id_num\n                                                    -->   705 / 705\n\n-- Vì vậy giữ cả hai dạng: order_id VARCHAR và order_id_num BIGINT.",
-    "pitfall": "Con số 0 ở trên không có nghĩa là không có chuyện gì xảy ra, mà nghĩa là cả 705 bản sửa sẽ được thêm vào như những đơn hàng mới. Vẫn khách đó, vẫn số tiền đó, nhưng được đếm hai lần, và không có lỗi nào ở đâu cả. Còn nấc thứ ba, tức tự sinh khoá riêng, nghe an toàn nhất nhưng không miễn phí: mỗi lần nạp đều phải tra khoá, mà dữ liệu về trễ khiến phép tra đó phải với cả vào lịch sử chứ không chỉ lô hôm nay; mỗi lần dò lỗi ngược về nguồn cũng dài thêm một chặng. Và nó không xoá được phần chuẩn hoá, vì phép tra vẫn phải khớp chuỗi có tiền tố với con số cũ, phần đó chỉ chuyển vào bên trong bước gán khoá.",
-    "sourceLink": {
-      "text": "Kimball Group — surrogate keys",
-      "url": "https://www.kimballgroup.com/1998/05/surrogate-keys/"
-    }
-  },
-  {
-    "id": "c_contract_amendment",
-    "subject": "Quality Gate",
-    "term": "68. Contract sửa đổi theo phiên bản, không ghi đè bản cũ",
-    "pronounceOrType": "Cho contract tiến hoá cùng dữ liệu",
-    "definition": "Khi dữ liệu nguồn đổi hình dạng thì contract mô tả nó cũng phải đổi theo, nếu không cổng kiểm sẽ từ chối phần lớn dữ liệu một cách hoàn toàn đúng đắn. Nhưng bản sửa đổi không được ghi đè lên nội dung cũ, vì như thế bạn mất luôn khả năng kiểm lại phần lịch sử. Cách làm là mỗi bản mang mốc ngày bắt đầu có hiệu lực của riêng nó, để cổng kiểm giữ được nhiều phiên bản cùng lúc và kiểm mỗi file theo đúng phiên bản đang có hiệu lực vào ngày của file đó.",
-    "formulaOrSyntax": "contract v1  effective_from 2026-06-01\ncontract v2  effective_from 2026-07-16\ncontract v3  effective_from 2026-08-01\n\n-- Cổng kiểm chọn phiên bản theo ngày của file,\n-- nhưng nên đối chiếu thêm với header và cảnh báo khi hai bên bất đồng.",
-    "pitfall": "Có một luật nhỏ mà đắt: ngày trong tên file chỉ là siêu dữ liệu, còn header mới là dữ liệu. Khi hai bên mâu thuẫn, hãy tin cái quyết định việc đọc, tức header, nhưng phải ghi một dòng cảnh báo. Nếu tin vào ngày thì bạn sẽ đem schema của thời kỳ cũ ra đọc một file thuộc thời kỳ mới, giá trị rơi vào sai cột mà không lỗi nào báo. Ngoài ra, đừng đánh số phiên bản theo cảm tính: thêm vài cột mà bên tiêu thụ cũ có thể bỏ qua thì là thay đổi nhỏ, nhưng nếu đi kèm việc viết lại ý nghĩa của một quy tắc nghiệp vụ đang có thì phải coi là thay đổi lớn.",
-    "sourceLink": {
-      "text": "Data Contract Specification — versioning",
-      "url": "https://datacontract.com/"
-    }
-  },
-  {
-    "id": "c_structural_vs_drift",
-    "subject": "Quality Gate",
-    "term": "69. File không đọc được khác với file đổi cấu trúc",
-    "pronounceOrType": "Hai sự cố đòi hai cách xử lý khác nhau",
-    "definition": "Một file trượt cổng kiểm có thể vì bên cung cấp đổi cấu trúc, cũng có thể vì bản thân file hỏng ở mức ký tự nên không đọc nổi. Hai chuyện này đòi hai phản ứng khác hẳn nhau: đổi cấu trúc thì yêu cầu bên cung cấp tăng phiên bản và thông báo đúng quy trình, còn không đọc được thì báo sự cố truyền file. Cổng kiểm phải phân biệt được, nếu không nó đưa ra kết luận sai và bạn đi tìm một thay đổi chưa từng xảy ra.",
-    "formulaOrSyntax": "-- Hàm dò cấu trúc không ném lỗi với file hỏng, nó thoái hoá:\n-- mấy dòng gãy làm nhiễu việc dò dấu phân cách, nó chốt lấy một dấu\n-- vốn không có trong dữ liệu, rồi trả về ĐÚNG MỘT cột.\n\n-- Dấu hiệu nhận biết: schema dò ra co lại còn một cột duy nhất,\n-- mà tên của cột đó lại chứa dấu phẩy hoặc dấu nháy\n-- (thực chất là cả dòng header bị gộp thành một cái tên).",
-    "pitfall": "Không dạy cổng kiểm sự phân biệt này thì nó sẽ ngoan ngoãn báo là thiếu toàn bộ cột và có thêm một cột lạ khổng lồ, tức là kết luận đổi cấu trúc cho một file thật ra có đúng số cột như mọi file cùng thời kỳ, chỉ gãy ở mức byte. Nên xếp trường hợp này vào nhóm lỗi cấu trúc như một sự cố phía nhà cung cấp, chứ đừng xếp vào phần kiểm schema. Nửa còn lại của việc phát hiện là bọc thao tác đọc thử trong một khối bắt lỗi.",
-    "sourceLink": {
-      "text": "datacontract CLI — phân loại lỗi theo từng nhóm kiểm",
-      "url": "https://cli.datacontract.com/"
-    }
-  },
-  {
-    "id": "c_own_prior_changes",
-    "subject": "Reliability & Ops",
-    "term": "70. Đối soát với nguồn ngoài thì phải trừ đi những gì mình đã tự sửa",
-    "pronounceOrType": "Bước đầu tiên khi một phép đối soát không khớp",
-    "definition": "Bản kê khai mà bên cung cấp gửi kèm dữ liệu là một mốc đối chiếu rất tốt, nhưng nó chỉ biết về dữ liệu lúc rời khỏi tay họ. Nó không biết gì về những thao tác bạn đã tự làm sau đó. Một bước khử trùng lặp hoàn toàn đúng đắn ở lần chạy trước sẽ làm số dòng của bạn ít hơn số họ khai, và phép đối soát hôm nay sẽ không khớp vì một lý do chẳng liên quan gì tới lần chạy hôm nay.",
-    "formulaOrSyntax": "-- Trước khi đi tìm nguyên nhân ở bên ngoài, hãy tự hỏi:\n--   mình đã xoá, gộp hay sửa gì trên phần dữ liệu này chưa?\n--   nếu có, bản kê khai bên ngoài có biết chuyện đó không?\n\n-- Nếu tiền đề đã bị chính mình làm lệch, hãy dựng lại phần dữ liệu đó\n-- từ nguồn thô cho sạch, và dời bản cũ sang thư mục rác thay vì xoá hẳn.",
-    "pitfall": "Không có gì báo cho bạn biết sai lệch đến từ chính mình. Bạn sẽ ngồi truy một chênh lệch vài trăm dòng và mặc định rằng hoặc nguồn có vấn đề, hoặc pipeline hôm nay có vấn đề. Vì vậy hãy biến việc rà lại lịch sử thao tác của chính mình thành bước đầu tiên chứ không phải bước cuối cùng. Nói rộng hơn thì một kết quả hoàn toàn đúng ở bài trước vẫn có thể là tiền đề sai cho bài sau.",
-    "sourceLink": {
-      "text": "dbt-audit-helper — so sánh hai phiên bản của cùng một bảng",
-      "url": "https://github.com/dbt-labs/dbt-audit-helper"
-    }
-  },
+    "term": "39. Validate cái Validator (Quản trị file cấu hình)",
+    "pronounceOrType": "Bảo vệ các bộ luật chặn rác",
+    "definition": "Kỹ sư thường viết luật kiểm tra dữ liệu rất khắt khe, nhưng lại vô cùng dễ dãi với chính file cấu hình YAML chứa các luật đó. Dùng thư viện đọc YAML bình thường trả về một kiểu dữ liệu trần (Dict). Gõ sai chính tả một key cấu hình, không ai báo lỗi cả. Phải dùng các model kiểm tra cấu trúc (như Pydantic) với cờ `extra=\"forbid\"` để bắt lỗi chính tả ngay lúc đọc file.",
+    "formulaOrSyntax": "class ContractConfig(BaseModel):\n    model_config = ConfigDict(extra=\"forbid\")\n# Chặn đứng việc kỹ sư gõ sai 'nullible' thay vì 'nullable'",
+    "pitfall": "Dùng `yaml.safe_load` mù quáng. Có người gõ nhầm chữ `nullable` thành `nullible`, YAML nuốt trọn vẹn. Kết quả là một luật chặn rác quan trọng bị tắt ngấm trong im lặng, dữ liệu bẩn cứ thế ùa vào kho[cite: 12].",
+    "sourceLink": { "text": "Pydantic Extra Forbid", "url": "https://docs.pydantic.dev/latest/api/config/" }
+  }
 ]

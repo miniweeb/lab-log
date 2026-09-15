@@ -113,7 +113,7 @@ export interface AssignmentSpec {
   title: Bi
   summary: Bi
   estHours?: number
-  difficulty?: 1 | 2 | 3
+  difficulty?: 1 | 2 | 3 | 4
   /** Một câu trả lời cho "học xong bài này tôi làm được gì" */
   outcome?: Bi
   theory: TheorySection[]

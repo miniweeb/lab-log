@@ -13,6 +13,7 @@ import { a09 } from './a09'
 import { a10 } from './a10'
 import { a11 } from './a11'
 import { a12 } from './a12'
+import { a13 } from './a13'
 
 /**
  * MỞ MỘT BÀI MỚI:
@@ -44,9 +45,7 @@ export const assignments: AssignmentSpec[] = [
   a10,
   a11,
   a12,
-  locked('A13', 'Resource monitoring', 'Giám sát tài nguyên',
-    'Measure memory and spill, and know before it dies.',
-    'Đo bộ nhớ và lượng tràn ra đĩa, biết trước lúc sắp hỏng.'),
+  a13,
   locked('A14', 'Performance', 'Tối ưu hiệu năng',
     'Find the real bottleneck instead of optimizing by feel.',
     'Tìm nút thắt thật thay vì tối ưu theo cảm giác.'),

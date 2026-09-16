@@ -1,5 +1,4 @@
 import type { AssignmentSpec } from '../types'
-import { bi } from '../types'
 import { a00 } from './a00'
 import { a01 } from './a01'
 import { a02 } from './a02'
@@ -14,22 +13,13 @@ import { a10 } from './a10'
 import { a11 } from './a11'
 import { a12 } from './a12'
 import { a13 } from './a13'
-
+import { a14 } from './a14'
+import { a15 } from './a15'
 /**
  * MỞ MỘT BÀI MỚI:
  * 1. Viết src/content/aNN.ts theo khuôn của a02.ts (lý thuyết 5 tầng + task song ngữ)
  * 2. import vào đây và thay dòng locked() tương ứng
  */
-const locked = (code: string, en: string, viTitle: string, sEn: string, sVi: string): AssignmentSpec => ({
-  id: code.toLowerCase(),
-  code,
-  title: bi(en, viTitle),
-  summary: bi(sEn, sVi),
-  locked: true,
-  theory: [],
-  terms: [],
-  tasks: [],
-})
 
 export const assignments: AssignmentSpec[] = [
   a00,
@@ -46,12 +36,8 @@ export const assignments: AssignmentSpec[] = [
   a11,
   a12,
   a13,
-  locked('A14', 'Performance', 'Tối ưu hiệu năng',
-    'Find the real bottleneck instead of optimizing by feel.',
-    'Tìm nút thắt thật thay vì tối ưu theo cảm giác.'),
-  locked('A15', 'dbt project', 'Đóng gói bằng dbt',
-    'Package everything into a project you can hand over.',
-    'Gói toàn bộ thành một dự án bàn giao được.'),
+  a14,
+  a15,
 ]
 
 export const findAssignment = (id: string) => assignments.find((a) => a.id === id)

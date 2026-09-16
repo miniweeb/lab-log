@@ -124,8 +124,8 @@ function View({ a, onBack }: { a: AssignmentSpec; onBack: () => void }) {
                   {a.estHours && <span>~{a.estHours} giờ</span>}
                   {a.difficulty && (
                     <span>
-                      {'★'.repeat(a.difficulty)}
-                      {'☆'.repeat(3 - a.difficulty)}
+                    {'★'.repeat(Math.min(5, Math.max(0, a.difficulty)))}
+                    {'☆'.repeat(5 - Math.min(5, Math.max(0, a.difficulty)))}
                     </span>
                   )}
                 </div>

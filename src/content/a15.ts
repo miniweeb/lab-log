@@ -151,7 +151,7 @@ seeds:
               kind: 'code',
               lang: 'text',
               body: `etl_lab_dbt:
-  target: small            # dev trên small — luật của lab từ A00
+  target: small            # dev trên small - luật của lab từ A00
   outputs:
     small:
       type: duckdb
@@ -561,7 +561,7 @@ from {{ ref('stg_shopcore__products') }}`,
               lang: 'sql',
               body: `-- Mỗi dòng một đơn hàng, bản sửa mới nhất thắng. ĐÂY CHÍNH LÀ transaction của
 -- A07 và chiến lược (c) của A08: delete+insert của dbt xoá mọi order_date có mặt
--- trong lô, rồi chèn lô vào — một phép refresh phân vùng theo ngày.
+-- trong lô, rồi chèn lô vào - một phép refresh phân vùng theo ngày.
 {{ config(
     materialized='incremental',
     incremental_strategy='delete+insert',
@@ -837,7 +837,7 @@ models:
 -- order_total = items_total - discount_amount đúng cho cả v1/v2/v3, vì các dòng
 -- v1 đã được canonical hoá với discount_amount = 0.
 -- ~0,5% lệch là rác đã ghi nhận; chỉ đỏ khi vượt dung sai của contract
--- (total_vs_items_mismatch = 1% — đúng con số A05 nạp từ file YAML).
+-- (total_vs_items_mismatch = 1% - đúng con số A05 nạp từ file YAML).
 with items_sum as (
     select order_id, sum(qty * unit_price) as items_total
     from {{ ref('fct_order_items') }}
@@ -907,10 +907,10 @@ having bad_rows > 0.01 * checked_rows`,
             {
               kind: 'code',
               lang: 'powershell',
-              body: `# 1) nền: build toàn phần (đã có từ Task 7 — chừng 20-90 giây ở scale small)
+              body: `# 1) nền: build toàn phần (đã có từ Task 7 - chừng 20-90 giây ở scale small)
 # 2) cửa sổ 3 ngày, đúng khuôn --start/--end của A11:
 dbt build --vars "{start_date: 2026-08-01, end_date: 2026-08-03}"
-# 3) chạy LẠI đúng lệnh đó — bài kiểm chạy hai lần của A07:
+# 3) chạy LẠI đúng lệnh đó - bài kiểm chạy hai lần của A07:
 dbt build --vars "{start_date: 2026-08-01, end_date: 2026-08-03}"`,
             },
             {
@@ -919,7 +919,7 @@ dbt build --vars "{start_date: 2026-08-01, end_date: 2026-08-03}"`,
               body: `SELECT count(*), count(DISTINCT order_id) FROM core.fct_orders;   -- 4053208, 4053208
 SELECT order_date, count(*) FROM core.fct_orders
 WHERE order_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-03'
-GROUP BY 1 ORDER BY 1;    -- 2026-08-01: 46273 · 08-02: 45874 · 08-03: 56940`,
+GROUP BY 1 ORDER BY 1;    -- 2026-08-01: 46273 | 08-02: 45874 | 08-03: 56940`,
             },
             {
               kind: 'trap',
@@ -1113,9 +1113,9 @@ dbt build --target full`,
 models:
   - name: daily_store_sales
     description: >
-      Mỗi dòng là một bộ (order_date, store_id, currency) — hiệu quả bán của từng
+      Mỗi dòng là một bộ (order_date, store_id, currency) - hiệu quả bán của từng
       cửa hàng theo ngày: số đơn, số khách phân biệt, doanh thu và số đơn huỷ.
-      Currency nằm trong grain là CỐ Ý — cộng USD với VND thành một số là lời nói
+      Currency nằm trong grain là CỐ Ý - cộng USD với VND thành một số là lời nói
       dối gấp 25.000 lần, đúng vết sẹo A10 mà mart này từ chối lặp lại.
     columns:
       - name: gross_revenue
@@ -1170,7 +1170,7 @@ models:
               kind: 'code',
               lang: 'powershell',
               body: `dbt docs generate
-dbt docs serve      # mở http://localhost:8080 — Ctrl+C để dừng`,
+dbt docs serve      # mở http://localhost:8080 - Ctrl+C để dừng`,
             },
             {
               kind: 'why',
@@ -1303,15 +1303,15 @@ dbt docs serve      # mở http://localhost:8080 — Ctrl+C để dừng`,
             {
               kind: 'code',
               lang: 'text',
-              body: `1  shopcore.orders (lake)              DECIMAL(14,2), đã sạch — bộ dọn $ / N/A /
+              body: `1  shopcore.orders (lake)              DECIMAL(14,2), đã sạch - bộ dọn $ / N/A /
                                        dấu phẩy thập phân của A03 chạy trước khi ghi Parquet
 2  stg_shopcore__orders.order_total    đi qua, không đụng gì
 3  fct_orders.order_total              chỉ sống sót trên dòng thắng của cửa sổ khử trùng
-                                       lặp — một bản sửa THAY THẾ giá trị này
+                                       lặp - một bản sửa THAY THẾ giá trị này
 4  daily_store_sales.gross_revenue     sum(order_total) theo (order_date, store_id, currency)
-4' daily_store_sales.avg_order_value   round(avg(order_total), 2) — cùng cột, measure thứ hai
+4' daily_store_sales.avg_order_value   round(avg(order_total), 2) - cùng cột, measure thứ hai
 4" daily_store_sales.orders_missing_total  count(*) filter (where order_total is null)
-4‴ tests/assert_order_totals_reconcile     so với sum(qty * unit_price) − discount_amount`,
+4''' tests/assert_order_totals_reconcile     so với sum(qty * unit_price) - discount_amount`,
             },
             {
               kind: 'why',
@@ -1448,7 +1448,7 @@ dbt docs serve      # mở http://localhost:8080 — Ctrl+C để dừng`,
 sold_units        sum(qty)                                           additive: CÓ
 returned_lines    count(*) filter (where status = 'refunded')         additive: CÓ
 returned_orders   count(distinct order_id) filter (...)               additive: KHÔNG
-return_rate       returned_units / sold_units                         KHÔNG — ĐỪNG LƯU`,
+return_rate       returned_units / sold_units                         KHÔNG - ĐỪNG LƯU`,
             },
             {
               kind: 'why',
@@ -1517,7 +1517,7 @@ WHERE sold_units > 0;`,
               lang: 'sql',
               body: `-- Grain: mỗi dòng là một bộ (order_month, region, sku).
 -- "Trả lại" = một dòng hàng trên đơn có trạng thái mới nhất là 'refunded'. Tín
--- hiệu nằm ở mức ĐƠN, nên mọi dòng của một đơn hoàn tiền đều bị tính — xem description.
+-- hiệu nằm ở mức ĐƠN, nên mọi dòng của một đơn hoàn tiền đều bị tính - xem description.
 with lines as (
 
     select
@@ -1594,28 +1594,28 @@ group by 1, 2, 3`,
             {
               kind: 'code',
               lang: 'text',
-              body: `source + external_location          A01/A02 — read_csv / read_parquet trên lake
+              body: `source + external_location          A01/A02 - read_csv / read_parquet trên lake
 source freshness                    A05 đối soát + điều khoản freshness của A06
-seed (country_map)                  A03 — bảng ánh xạ quy chuẩn
+seed (country_map)                  A03 - bảng ánh xạ quy chuẩn
 staging view (đổi tên/ép kiểu/dọn)  A03 staging + canonicalizer của A10
-ref() — đồ thị phụ thuộc            A11 Task 8 — "marts chạy lại sau core"
-materialization (view/table)        A03 — thiết kế tầng, cái gì lưu, cái gì dẫn xuất
+ref() - đồ thị phụ thuộc            A11 Task 8 - "marts chạy lại sau core"
+materialization (view/table)        A03 - thiết kế tầng, cái gì lưu, cái gì dẫn xuất
 incremental delete+insert theo ngày A07 BEGIN;DELETE;INSERT;COMMIT + A08 chiến lược (c)
-cửa sổ khử trùng lặp trong fact     A08 chiến lược (a) — updated_at mới nhất thắng
+cửa sổ khử trùng lặp trong fact     A08 chiến lược (a) - updated_at mới nhất thắng
 var("start_date"/"end_date")        A11 runner --start/--end
 --full-refresh                      A11 --force (restatement, kèm thông báo)
-generic test (not_null/unique/…)    A05 bộ check
-lời hứa theo cột của contract       A05/A06 — các điều khoản YAML, ở dạng chạy được
-severity: warn / ngưỡng             A05 — rác đã ghi nhận so với lỗi thật
+generic test (not_null/unique/...)    A05 bộ check
+lời hứa theo cột của contract       A05/A06 - các điều khoản YAML, ở dạng chạy được
+severity: warn / ngưỡng             A05 - rác đã ghi nhận so với lỗi thật
 singular test (đối soát dòng hàng)  A05 kiểm bắc-nhiều-trường, mù era nhờ A10
---target small/full                 A00 — luật dev trên small
-threads + DuckDB một tiến trình     A12 — phép tính ngân sách và luật một người ghi
+--target small/full                 A00 - luật dev trên small
+threads + DuckDB một tiến trình     A12 - phép tính ngân sách và luật một người ghi
 description: trong schema.yml        journal của bạn + ngữ nghĩa từng cột trong contract A06
-dbt docs generate = data catalog    chưa từng có — lần đầu metadata của lab tra cứu được
+dbt docs generate = data catalog    chưa từng có - lần đầu metadata của lab tra cứu được
 DAG = lineage mức bảng              bức tranh "cái gì nuôi cái gì" bạn mang trong đầu từ A02
-dbt ls --select source:…+           A06 change_management — trả lời "hỏng cái gì" trước khi gật
-lineage mức cột (làm tay)           chuỗi cleaner A03 → A10; không thứ gì trong lab vẽ nó
-provenance mức dòng                 A03/A07 — _data_date + _run_id → ops.etl_runs. Tầng mà
+dbt ls --select source:...+           A06 change_management - trả lời "hỏng cái gì" trước khi gật
+lineage mức cột (làm tay)           chuỗi cleaner A03 -> A10; không thứ gì trong lab vẽ nó
+provenance mức dòng                 A03/A07 - _data_date + _run_id -> ops.etl_runs. Tầng mà
                                     dbt KHÔNG mô hình hoá: nó sống trên dòng dữ liệu và trên
                                     cuốn sổ của bạn, không nằm trong DAG`,
             },

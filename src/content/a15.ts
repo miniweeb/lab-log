@@ -259,12 +259,16 @@ sources:
       (dưới dạng canonical Parquet lake dựng ở A10, vá ở A11) cộng các file CSV
       dimension đúng y như lúc nhận, bẩn có chủ đích.
     meta:
-      external_location: "read_csv('{{ env_var('ETL_LAB_DATA') }}{{ '/small' if target.name == 'small' else '' }}/raw/dims/{name}.csv', header=true, all_varchar=true)"
+      external_location: >-
+        read_csv('{{ env_var('ETL_LAB_DATA') }}{{ '/small' if target.name == 'small'
+        else '' }}/raw/dims/{name}.csv', header=true, all_varchar=true)
     tables:
       - name: orders
         description: Mỗi dòng là một sự kiện đơn hàng, schema canonical, đủ cả ba era.
         meta:
-          external_location: "read_parquet('{{ env_var('ETL_LAB_DATA') }}{{ '/small' if target.name == 'small' else '' }}/lake/orders_v=*/*/*.parquet', hive_partitioning=true)"
+          external_location: >-
+            read_parquet('{{ env_var('ETL_LAB_DATA') }}{{ '/small' if target.name ==
+            'small' else '' }}/lake/orders_v=*/*/*.parquet', hive_partitioning=true)
         loaded_at_field: updated_at
         freshness:
           warn_after: {count: 24, period: hour}
@@ -1042,7 +1046,7 @@ dbt build --target full`,
   - name: fct_orders
     description: >
       Mỗi dòng là một đơn hàng, schema canonical, đã áp bản sửa mới nhất. Dựng từ
-      lake bằng cách giữ bản có \`updated_at\` cao nhất cho mỗi \`order_id_num\`, nên
+      lake bằng cách giữ bản có updated_at cao nhất cho mỗi order_id_num, nên
       một đơn được sửa ở file sau chỉ xuất hiện một lần, ở trạng thái cuối cùng.
       Dựng lại theo cửa sổ ngày (delete+insert), nên nạp lại dải ngày nào cũng an toàn.
     columns:
@@ -1050,19 +1054,19 @@ dbt build --target full`,
       # các mục Task 7 của chúng, kèm test, nếu không TOTAL tụt từ 25 xuống 21.
       - name: order_id
         description: >
-          Khoá đơn hàng canonical, tiền tố \`ORD-\` cộng số 10 chữ số đệm 0. Ổn định
+          Khoá đơn hàng canonical, tiền tố ORD- cộng số 10 chữ số đệm 0. Ổn định
           qua cả ba era schema — id dạng số của v1/v2 đã được định dạng lại về hình
           này ở A10 để bản sửa của v3 khớp được với lịch sử v1.
         data_tests: [not_null, unique]
       - name: order_date
         description: >
-          Ngày nghiệp vụ của đơn, dẫn xuất từ \`order_ts\` đã làm sạch. Đây là khoá
+          Ngày nghiệp vụ của đơn, dẫn xuất từ order_ts đã làm sạch. Đây là khoá
           phân vùng của lake và cũng là khoá delete+insert của model này — nạp lại
           một dải ngày sẽ thay thế đúng bằng ấy dòng.
         data_tests: [not_null]
       - name: customer_id
         description: >
-          Khách đặt đơn; khoá ngoại về \`dim_customers\`. NULL ở đây CÓ NGHĨA — contract
+          Khách đặt đơn; khoá ngoại về dim_customers. NULL ở đây CÓ NGHĨA — contract
           nói đó là mua không đăng nhập, không phải dữ liệu thiếu. Khoảng 0,05% id là
           mồ côi (rác đã ghi nhận từ A05), và đó là lý do phép kiểm quan hệ chỉ cảnh
           báo chứ không làm đỏ.
@@ -1075,7 +1079,7 @@ dbt build --target full`,
                 severity: warn
       - name: currency
         description: >
-          Mã tiền tệ ISO của \`order_total\` và giá các dòng hàng. ĐỪNG BAO GIỜ cộng
+          Mã tiền tệ ISO của order_total và giá các dòng hàng. ĐỪNG BAO GIỜ cộng
           xuyên tiền tệ — số tiền VND lớn hơn USD chừng 25.000 lần, và đó là lý do
           mọi mart trong dự án này đều mang currency trong grain.`,
             },
@@ -1120,13 +1124,13 @@ models:
     columns:
       - name: gross_revenue
         description: >
-          Tổng \`fct_orders.order_total\` theo ngày, cửa hàng và tiền tệ. ĐÃ BAO GỒM
+          Tổng fct_orders.order_total theo ngày, cửa hàng và tiền tệ. ĐÃ BAO GỒM
           đơn huỷ và đơn hoàn tiền; doanh thu thuần là một câu hỏi khác và sẽ là
           một mart khác.
       - name: orders_missing_total
         description: >
           Số đơn có tổng tiền không parse được thành số. Được đưa ra thành cột chứ
-          không giấu đi — nó là phần chú thích về mẫu số cho \`avg_order_value\`.`,
+          không giấu đi — nó là phần chú thích về mẫu số cho avg_order_value.`,
             },
             {
               kind: 'text',

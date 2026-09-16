@@ -477,5 +477,55 @@ export const DEFAULT_CONCEPTS: ConceptItem[] = [
     "formulaOrSyntax": "class ContractConfig(BaseModel):\n    model_config = ConfigDict(extra=\"forbid\")\n# Chặn đứng việc kỹ sư gõ sai 'nullible' thay vì 'nullable'",
     "pitfall": "Dùng `yaml.safe_load` mù quáng. Có người gõ nhầm chữ `nullable` thành `nullible`, YAML nuốt trọn vẹn. Kết quả là một luật chặn rác quan trọng bị tắt ngấm trong im lặng, dữ liệu bẩn cứ thế ùa vào kho[cite: 12].",
     "sourceLink": { "text": "Pydantic Extra Forbid", "url": "https://docs.pydantic.dev/latest/api/config/" }
+  },
+  {
+    "id": "c_single_writer_vs_scatter_gather",
+    "subject": "Reliability & Ops",
+    "term": "41. Khóa file độc quyền (Single-Writer Lock) & Kiến trúc Scatter-Gather",
+    "pronounceOrType": "Tránh tranh chấp ghi trong môi trường Database nhúng",
+    "definition": "Các database server (như Postgres, Snowflake) có hệ thống trung tâm để xếp hàng hàng ngàn kết nối ghi cùng lúc. Nhưng các database nhúng (DuckDB, SQLite) chạy trực tiếp trong script của bạn thì bảo vệ dữ liệu bằng cách khóa hẳn file ở tầng hệ điều hành: Đã có một tiến trình mở để ghi, mọi tiến trình khác lập tức bị chặn[cite: 16]. Rào cản này ép chúng ta phải dùng kiến trúc Scatter-Gather: Các tiến trình con tự xử lý dữ liệu và ghi ra các file Parquet rời rạc (Scatter). Sau khi xong hết, đúng một tiến trình duy nhất mở Database lên để gom tất cả vào kho (Gather)[cite: 17].",
+    "formulaOrSyntax": "-- Khuôn xử lý đa tiến trình an toàn với DB nhúng:\nStage (N worker) ➔ Ghi ra N file Parquet độc lập trên Data Lake.\nCommit (1 worker) ➔ Mở DB ➔ Nạp toàn bộ file Parquet vừa tạo.",
+    "pitfall": "Thấy DuckDB chạy nhanh nên cho 8 worker cùng chạy lệnh INSERT thẳng vào Warehouse. Hệ thống chết ồn ào ngay lập tức với lỗi `IOException`[cite: 16]. Nhưng cái chết ồn ào này lại là một món quà; nếu hệ điều hành thả rông cho ghi đè, file database sẽ hỏng vật lý (corruption) không thể cứu vãn.",
+    "sourceLink": { "text": "DuckDB Concurrency", "url": "https://duckdb.org/docs/stable/connect/concurrency" }
+  },
+  {
+    "id": "c_resource_overcommit",
+    "subject": "Reliability & Ops",
+    "term": "42. Lời hứa khống tài nguyên (CPU Oversubscription & RAM Overcommit)",
+    "pronounceOrType": "Nghẽn cổ chai cấp độ hệ điều hành",
+    "definition": "Máy tính không tự to ra chỉ vì bạn gọi thêm tiến trình. Chạy song song phải tính toán đánh đổi giới hạn vật lý: \n1. Vắt kiệt CPU (Oversubscription): Nhét 64 luồng vào máy 8 lõi không làm nó nhanh gấp 8, nó chỉ khiến hệ điều hành tốn sức chuyển đổi qua lại giữa các luồng (Context switching), CPU ghim 100% nhưng chạy chậm rì[cite: 16, 17]. \n2. Hứa khống RAM (Overcommit): Cấp 12GB cho 8 worker là tự hứa 96GB trên cái máy 16GB[cite: 17]. Không hệ thống nào cản bạn lúc khởi động, nhưng lúc chạy, RAM đầy sẽ ép máy phải tráo dữ liệu ra ổ cứng (Swapping), đĩa quay liên tục và máy chết đứng[cite: 17].",
+    "formulaOrSyntax": "-- Mở rộng thực tế: Kubernetes vs. Local Machine\nTrên máy dev: Cạn RAM gây lỗi hỏng trong im lặng (máy đơ, không văng lỗi rõ ràng).\nTrên K8s: Dùng cơ chế `requests` và `limits`. Vượt RAM ➔ K8s bắn lỗi OOMKilled (Chết ồn ào) và chém ngay tiến trình vi phạm để cứu cụm server.",
+    "pitfall": "Quên khai báo bộ nhớ tối đa, các tiến trình âm thầm dùng mức mặc định (80% RAM máy/tiến trình). Pipeline sụp đổ mà không để lại bất kỳ dòng log lỗi (Exception) nào[cite: 16, 17].",
+    "sourceLink": { "text": "DuckDB Memory Management", "url": "https://duckdb.org/docs/stable/guides/performance/how_to_tune_workloads" }
+  },
+  {
+    "id": "c_data_skew_straggler",
+    "subject": "Reliability & Ops",
+    "term": "43. Lệch tải (Data Skew) & Vấn đề kẻ chậm tiến (Straggler)",
+    "pronounceOrType": "Chiến lược phân bổ công việc (Load Balancing)",
+    "definition": "Dữ liệu thực tế không bao giờ chia đều. Một ngày sale lớn (spike day) to gấp 3 ngày thường. Khi chạy song song một dải ngày, nếu bạn quăng việc ngẫu nhiên, ngày to nhất có thể rớt xuống chạy cuối cùng. Khi đó, 7 lõi CPU chạy xong sớm sẽ ngồi chơi xơi nước nhìn 1 lõi (Straggler) cày cục nốt cục dữ liệu khổng lồ[cite: 17]. Thời gian cả nhóm bị kéo tụt bởi kẻ chậm nhất.",
+    "formulaOrSyntax": "-- Mở rộng thực tế: Apache Spark vs. Python thuần\nSpark xử lý Data Skew bằng kỹ thuật Salting hoặc Dynamic Allocation (cắt nhỏ task to ra rải đều), cực kỳ xịn nhưng đánh đổi bằng việc vận hành cụm JVM phức tạp.\nỞ Python thuần: Chỉ cần xếp việc to nhất lên chạy đầu tiên (Biggest-first), các việc nhỏ sẽ tự lấp vào các khoảng hở thời gian phía sau. 1 dòng code nhưng giải quyết 80% vấn đề.",
+    "pitfall": "Mù quáng thêm Worker với ảo tưởng máy sẽ chạy nhanh tuyến tính. Việc tăng từ 4 lên 8 tiến trình sẽ không giúp bạn về đích sớm hơn nếu bạn không giải quyết cục bướu Straggler nằm ở cuối hàng đợi[cite: 16, 17].",
+    "sourceLink": { "text": "Multiprocessing Best Practices", "url": "https://docs.python.org/3/library/multiprocessing.html" }
+  },
+  {
+    "id": "c_race_condition_lake",
+    "subject": "Storage & Pruning",
+    "term": "44. Xung đột ghi chéo (Race Condition) trên Data Lake",
+    "pronounceOrType": "Nguy cơ đâm xe khi không có khóa bảo vệ",
+    "definition": "Vì sao không cho các tiến trình dùng lệnh `PARTITION_BY` ghi thẳng vào chung một thư mục ngày trên Data Lake? Nguyên nhân nằm ở Dữ liệu về trễ (Late-arriving). File của ngày D có chứa bản cập nhật đơn hàng của ngày D-7. Nếu Worker A đang xử lý file ngày D, và Worker B xử lý ngày D-3, cả hai rất có thể sẽ cùng lúc tạo file đè vào thư mục của ngày `D-7`[cite: 17]. Hệ thống file không có khái niệm Transaction bảo vệ như Database.",
+    "formulaOrSyntax": "-- Mở rộng thực tế: Iceberg / Delta Lake\nĐể xử lý nhiều worker ghi chung 1 thư mục, Iceberg dùng Optimistic Concurrency Control (OCC). Worker cứ ghi file rác thoải mái, ai update file metadata.json trước thì thắng, người thua phải đọc lại và thử lại. Đánh đổi là phải cài đặt toàn bộ hệ sinh thái Table Format.\nỞ Data Lake thuần: Tách biệt hoàn toàn, bắt mỗi Worker sinh ra 1 file định danh UUID riêng biệt.",
+    "pitfall": "Cứ thấy API hỗ trợ `PARTITION_BY` là quăng vào chạy đa luồng. Worker 1 ghi xong dữ liệu, Worker 2 tới sau ghi file trùng tên mặc định lặng lẽ đè nát kết quả của Worker 1. Script báo xanh exit 0 nhưng dữ liệu hụt nghiêm trọng (Silent Failure)[cite: 17, 18].",
+    "sourceLink": { "text": "DuckDB Partitioned Writes", "url": "https://duckdb.org/docs/data/partitioning/partitioned_writes" }
+  },
+  {
+    "id": "c_amdahls_law",
+    "subject": "Reliability & Ops",
+    "term": "45. Định luật Amdahl & Giới hạn tàn khốc của tính toán song song",
+    "pronounceOrType": "Tìm đúng nút thắt cổ chai",
+    "definition": "Định luật Amdahl nói rằng: Tốc độ tối đa của một hệ thống bị khóa chặt bởi phần việc bắt buộc phải chạy tuần tự. Ví dụ khi xử lý 82 triệu dòng: Pha làm sạch chạy song song tốn 233 giây. Nhưng pha gom dữ liệu (Commit) bắt buộc chạy 1 tiến trình tốn tới 418 giây[cite: 16]. Dù bạn có siêu máy tính để ép pha làm sạch chạy trong 0 giây, tổng thời gian không bao giờ lặn xuống dưới mức 418 giây.",
+    "formulaOrSyntax": "-- Chẩn đoán nút thắt: CPU pha làm sạch lên xuống nhịp nhàng, nhưng pha Commit ghim 100% một lõi trong thời gian dài.\n-- Mở rộng thực tế: Dask / Ray\nMuốn phá vỡ giới hạn này, phải dùng các framework Distributed Computing (như Dask, Ray) để phân tán cả pha Commit. Đánh đổi: Tốn tài nguyên quản lý mạng (network overhead) và cụm máy ảo, code phức tạp hơn gấp nhiều lần.",
+    "pitfall": "Đổ thêm tiền mua máy nhiều lõi hơn khi chưa tìm ra nút thắt. Ở pha Commit, thay vì bắt engine sắp xếp toàn cục 82 triệu dòng (`PARTITION BY order_id`), hãy thu hẹp phạm vi gom nhóm xuống cấp cục bộ (`PARTITION BY order_date, order_id`). Sửa 1 câu SQL rẻ hơn mua 1 con server[cite: 16].",
+    "sourceLink": { "text": "Amdahl's Law", "url": "https://en.wikipedia.org/wiki/Amdahl%27s_law" }
   }
 ]

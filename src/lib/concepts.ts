@@ -527,5 +527,46 @@ export const DEFAULT_CONCEPTS: ConceptItem[] = [
     "formulaOrSyntax": "-- Chẩn đoán nút thắt: CPU pha làm sạch lên xuống nhịp nhàng, nhưng pha Commit ghim 100% một lõi trong thời gian dài.\n-- Mở rộng thực tế: Dask / Ray\nMuốn phá vỡ giới hạn này, phải dùng các framework Distributed Computing (như Dask, Ray) để phân tán cả pha Commit. Đánh đổi: Tốn tài nguyên quản lý mạng (network overhead) và cụm máy ảo, code phức tạp hơn gấp nhiều lần.",
     "pitfall": "Đổ thêm tiền mua máy nhiều lõi hơn khi chưa tìm ra nút thắt. Ở pha Commit, thay vì bắt engine sắp xếp toàn cục 82 triệu dòng (`PARTITION BY order_id`), hãy thu hẹp phạm vi gom nhóm xuống cấp cục bộ (`PARTITION BY order_date, order_id`). Sửa 1 câu SQL rẻ hơn mua 1 con server[cite: 16].",
     "sourceLink": { "text": "Amdahl's Law", "url": "https://en.wikipedia.org/wiki/Amdahl%27s_law" }
+  },
+  /* ─────────── 46-49: GIÁM SÁT TÀI NGUYÊN & TỐI ƯU CHI PHÍ (A13) ─────────── */
+  {
+    "id": "c_use_method_monitoring",
+    "subject": "Reliability & Ops",
+    "term": "46. Phương pháp USE & Bẫy khi tự viết công cụ đo lường",
+    "pronounceOrType": "Chẩn đoán đúng chỗ nghẽn (bottleneck) thay vì đoán mò",
+    "definition": "Khi pipeline chạy chậm, hệ thống thường đang bị nghẽn ở một trong các tài nguyên: CPU, RAM, I/O ổ đĩa, hoặc dung lượng đĩa (theo phương pháp USE của Brendan Gregg). Việc đầu tiên là phải đo xem tài nguyên nào đang chạm trần để sửa đúng chỗ. Tuy nhiên, tự viết script đo lường bằng Python rất dễ sai: Nếu pipeline chạy nhiều tiến trình con (worker), chỉ đo tiến trình cha thì sẽ không thấy lượng RAM thực tế hệ thống đang tiêu thụ. Hàm đo CPU cũng hay báo sai về 0% nếu đối tượng đo không được lưu trữ (cache) qua các vòng lặp để lấy lịch sử.",
+    "formulaOrSyntax": "-- Mở rộng thực tế: Prometheus / Datadog vs. Tự viết Sampler (như thư viện psutil)\nTrong thực tế, người ta thường dùng các APM tool như Prometheus. \nĐánh đổi: Các tool này vẽ biểu đồ sẵn, nhưng tần suất lấy mẫu thường thưa (10-15 giây/lần), rất dễ bỏ sót các đợt tăng tải (spike) ngắn của tiến trình. Tự viết sampler bằng psutil tuy phải tự ghi file CSV để truy vấn lại, nhưng lấy mẫu được từng nửa giây, sát thực tế hơn cho các job ETL ngắn.",
+    "pitfall": "Thấy pipeline chậm, lập tức đi sửa code Python và tối ưu thuật toán. Trong khi thực tế hệ thống đang nghẽn ở I/O ổ đĩa (mất thời gian chờ đọc file). Bỏ ra vài giờ sửa code không giải quyết được nút thắt thật sự.",
+    "sourceLink": { "text": "Brendan Gregg — The USE Method", "url": "https://www.brendangregg.com/usemethod.html" }
+  },
+  {
+    "id": "c_oom_vs_swapping",
+    "subject": "Reliability & Ops",
+    "term": "47. Quản trị bộ nhớ: Lỗi OOM rõ ràng vs. Treo máy do Swapping",
+    "pronounceOrType": "Cơ chế phản ứng của hệ thống khi cạn RAM",
+    "definition": "Khi khối lượng dữ liệu lớn hơn mức RAM vật lý của máy, các công cụ xử lý có hai cách phản ứng. Cách 1: Các thư viện mặc định như Pandas sẽ nạp dữ liệu cho đến khi cạn RAM. Lúc này, hệ điều hành buộc phải đẩy bớt bộ nhớ xuống ổ cứng (gọi là Swapping hay Paging), làm máy chậm đi rõ rệt rồi treo hẳn mà không văng ra log lỗi nào. Cách 2: Các engine như DuckDB hay Spark cho phép đặt trần bộ nhớ (`memory_limit`). Khi chạm trần, chúng sẽ chủ động ghi file tạm ra đĩa (Out-of-core) để xử lý tiếp, hoặc ném thẳng lỗi `OutOfMemory`. Máy báo lỗi nhưng OS vẫn an toàn.",
+    "formulaOrSyntax": "-- Mở rộng thực tế: DuckDB memory_limit vs. Kubernetes resources.limits\nDuckDB `memory_limit` là giới hạn mềm: Chạm trần thì tự ghi tạm ra đĩa (spill), hi sinh tốc độ lấy sự ổn định.\nKubernetes (K8s) `resources.limits` là giới hạn cứng: Tiến trình vượt mức sẽ bị K8s chém ngay lập tức kèm lỗi OOMKilled để bảo vệ máy chủ.\nĐánh đổi: Đặt giới hạn cứng giúp lỗi lộ ra ngay, nhưng job sẽ bị dừng. Đặt giới hạn mềm giúp job chạy xong, nhưng tốn thời gian I/O ổ đĩa.",
+    "pitfall": "Tự tin mở file dữ liệu chục GB bằng Pandas trên máy chủ dùng chung. Script không báo lỗi gì nhưng lặng lẽ vắt kiệt RAM, hệ điều hành phải swap liên tục, kéo sập tốc độ của tất cả các dịch vụ khác đang chạy chung server.",
+    "sourceLink": { "text": "Kubernetes Resource Limits", "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/" }
+  },
+  {
+    "id": "c_io_volume_os_cache",
+    "subject": "Storage & Pruning",
+    "term": "48. Lượng I/O thực tế & Hiện tượng đánh lừa của OS Cache",
+    "pronounceOrType": "Thời gian chạy (Wall-clock) không phản ánh đúng tốc độ",
+    "definition": "Đo thời gian chạy tổng (wall-clock) thường cho kết quả không nhất quán vì hệ điều hành (OS) luôn tự động lưu đệm các file vừa đọc vào RAM (OS Cache). Lần chạy thứ 2 luôn nhanh hơn lần 1 dù code không đổi. Thước đo chính xác nhất cho việc tối ưu truy vấn là Số byte thực sự phải quét trên đĩa (I/O Volume). Cùng một dữ liệu, Parquet (nhờ lưu theo cột, nén và cắt phân vùng) có thể giảm hàng trăm lần I/O Volume so với CSV.",
+    "formulaOrSyntax": "-- Mở rộng thực tế: eBPF / iostat vs. hàm io_counters()\nĐể theo dõi I/O sâu ở tầng OS, các hệ thống lớn dùng `eBPF` hoặc `iostat`.\nĐánh đổi: `eBPF` cho độ chi tiết cực cao nhưng setup phức tạp và đòi quyền root. Trong phát triển ETL, dùng hàm `io_counters()` của thư viện hệ thống là đủ để biết tiến trình đã quét bao nhiêu byte, dễ nhúng thẳng vào code mà không cần cài thêm tool ngoài.",
+    "pitfall": "Vừa sửa vài dòng SQL, chạy lại lần 2 thấy số giây giảm một nửa, liền tự tin là code đã được tối ưu. Sự thật là bạn chỉ đang đo tốc độ đọc file từ RAM do OS Cache hỗ trợ. Nếu I/O Volume không giảm, thuật toán của bạn không hề tốt lên.",
+    "sourceLink": { "text": "DuckDB Explain Analyze", "url": "https://duckdb.org/docs/guides/meta/explain_analyze" }
+  },
+  {
+    "id": "c_right_sizing_cost_translation",
+    "subject": "Reliability & Ops",
+    "term": "49. Tìm giới hạn tài nguyên (Right-Sizing) & Quy đổi chi phí máy chủ",
+    "pronounceOrType": "Bài toán FinOps trong Data Engineering",
+    "definition": "Trên các nền tảng Cloud, cấp dư RAM hay CPU đều bị tính tiền thực tế. Tối ưu hệ thống không chỉ là code cho chạy nhanh, mà là kỹ thuật Right-sizing: Giảm dần mức cấp phát RAM (8GB ➔ 4GB ➔ 1GB ➔ 512MB) để tìm ra mức cấu hình thấp nhất mà job vẫn chạy xong với thời gian trong giới hạn cho phép. Khi tìm được cấu hình vừa đủ, bước cuối cùng là phải quy đổi mức tiết kiệm tài nguyên đó thành số tiền (USD) tiết kiệm được mỗi năm.",
+    "formulaOrSyntax": "-- Mở rộng thực tế: AWS Compute Optimizer / Karpenter\nCác cụm K8s dùng Karpenter có thể tự động đo lường tải và đổi sang máy ảo nhỏ hơn để tiết kiệm chi phí.\nĐánh đổi: Auto-scaler giải quyết việc cấp phát động rất tốt nhưng chúng phản ứng có độ trễ và khó chốt ngân sách từ đầu tháng. Kỹ sư tự Right-sizing ngay trong cấu hình job giúp chốt cứng baseline chi phí, dễ báo cáo ngân sách hơn.\n\n-- Phép tính quy đổi chi phí (Cost translation):\nThời_gian_tiết_kiệm × Giá_máy/giờ × Số_lần_chạy_trong_năm = Tiền tiết kiệm.",
+    "pitfall": "Chỉ dừng ở việc khoe code chạy nhanh hơn hay tốn ít RAM hơn. Cấp quản lý không quan tâm số mili-giây, cái họ cần là con số chi phí tiết kiệm được để quyết định xem có nên cấp thời gian cho đội Data tiếp tục tái cấu trúc (refactor) hệ thống hay không.",
+    "sourceLink": { "text": "AWS Compute Optimizer", "url": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/what-is-compute-optimizer.html" }
   }
 ]

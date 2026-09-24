@@ -568,5 +568,35 @@ export const DEFAULT_CONCEPTS: ConceptItem[] = [
     "formulaOrSyntax": "-- Mở rộng thực tế: AWS Compute Optimizer / Karpenter\nCác cụm K8s dùng Karpenter có thể tự động đo lường tải và đổi sang máy ảo nhỏ hơn để tiết kiệm chi phí.\nĐánh đổi: Auto-scaler giải quyết việc cấp phát động rất tốt nhưng chúng phản ứng có độ trễ và khó chốt ngân sách từ đầu tháng. Kỹ sư tự Right-sizing ngay trong cấu hình job giúp chốt cứng baseline chi phí, dễ báo cáo ngân sách hơn.\n\n-- Phép tính quy đổi chi phí (Cost translation):\nThời_gian_tiết_kiệm × Giá_máy/giờ × Số_lần_chạy_trong_năm = Tiền tiết kiệm.",
     "pitfall": "Chỉ dừng ở việc khoe code chạy nhanh hơn hay tốn ít RAM hơn. Cấp quản lý không quan tâm số mili-giây, cái họ cần là con số chi phí tiết kiệm được để quyết định xem có nên cấp thời gian cho đội Data tiếp tục tái cấu trúc (refactor) hệ thống hay không.",
     "sourceLink": { "text": "AWS Compute Optimizer", "url": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/what-is-compute-optimizer.html" }
+  },
+  {
+    "id": "c_benchmarking_reconciliation",
+    "subject": "Reliability & Ops",
+    "term": "51. Tối ưu code: Đo đạc tốc độ & Đối soát kết quả",
+    "pronounceOrType": "Tốc độ phải đi kèm tính chính xác",
+    "definition": "Thay vì đoán mò, phải đo thời gian từng bước để tìm ra đoạn code chạy chậm nhất. Việc đo đạc cũng cần chuẩn xác: chạy mồi 1 lần để tải dữ liệu lên RAM (warm-up), rồi đo 3 lần lấy trung vị. Quan trọng nhất: tối ưu code rất dễ làm sai logic hệ thống. Do đó, sau mỗi lần sửa, bắt buộc phải dùng lệnh EXCEPT hai chiều để đối chiếu xem dữ liệu mới có khớp 100% với dữ liệu cũ hay không.",
+    "formulaOrSyntax": "-- CÁCH ĐÚNG: Đo đạc xong phải kiểm tra kết quả ngay.\nSELECT * FROM file_cu EXCEPT SELECT * FROM file_moi;\nSELECT * FROM file_moi EXCEPT SELECT * FROM file_cu;\n-- Cả 2 chiều đều phải ra 0 dòng lệch.",
+    "pitfall": "Thấy tốc độ tăng vọt là hớn hở đẩy code lên Production mà không đối soát. Dữ liệu bị nhân đôi do vô tình xóa nhầm lệnh DISTINCT có tác dụng lọc dòng, hậu quả phá nát báo cáo nặng nề hơn cả việc code chạy chậm.",
+    "sourceLink": { "text": "dbt-audit-helper", "url": "https://github.com/dbt-labs/dbt-audit-helper" }
+  },
+  {
+    "id": "c_io_pruning_zone_maps",
+    "subject": "Storage & Pruning",
+    "term": "52. Tối ưu ổ đĩa: Cơ chế Đọc lướt (Pruning) & Sắp xếp dữ liệu",
+    "pronounceOrType": "Đọc nhanh nhất là không cần đọc",
+    "definition": "Hệ thống đọc file cực nhanh nhờ 3 cách né việc: Lọc đúng thư mục (không mở file thừa), Nhảy cóc khối dữ liệu (nhờ biết trước giá trị Min/Max của khối), và Chỉ đọc đúng cột cần thiết. Tuy nhiên, việc nhảy cóc (Zone Maps) chỉ hiệu quả nếu dữ liệu đã được gom cụm gọn gàng (ORDER BY) ngay từ lúc ghi file. Ngoài ra, nếu chia khối dữ liệu (Row Group) quá nhỏ, hệ thống sẽ mất nhiều thời gian để đọc mục lục hơn là đọc dữ liệu thật.",
+    "formulaOrSyntax": "-- Công cụ mở rộng: Z-Ordering trong Iceberg / Delta Lake\nCác định dạng bảng hiện đại dùng Z-Ordering để sắp xếp dữ liệu đan xen đa chiều, giúp tìm kiếm theo nhiều cột đều nhanh.\nĐổi lại: Kỹ thuật này ngốn rất nhiều CPU và thời gian tại thời điểm ghi file. Giải pháp thực tế nhất vẫn là gom cụm tuyến tính theo cột hay được filter nhất.",
+    "pitfall": "Bọc cột ngày tháng vào một hàm xử lý chuỗi (ví dụ: strftime). Việc này làm bộ tối ưu hóa (Optimizer) bị mù, ép hệ thống phải mở toàn bộ các file trên đĩa lên để định dạng lại từng dòng, làm chậm hàng trăm lần.",
+    "sourceLink": { "text": "Apache Parquet File Format", "url": "https://parquet.apache.org/docs/file-format/" }
+  },
+  {
+    "id": "c_set_based_optimizer_limits",
+    "subject": "SQL Fundamentals",
+    "term": "53. Xử lý tập hợp (Set-based) & Điểm mù của Optimizer",
+    "pronounceOrType": "Trách nhiệm tối ưu thuộc về Kỹ sư",
+    "definition": "Database được thiết kế để xử lý một lúc hàng triệu dòng (Tư duy tập hợp). Nếu bạn dùng vòng lặp Python kéo từng dòng lên rồi INSERT ngược lại, hệ thống sẽ phải trả phí khởi động cho từng câu lệnh, khiến tốc độ chậm đi hàng ngàn lần. Mặt khác, dù bộ tối ưu (Optimizer) có khả năng tự đảo thứ tự JOIN bảng to/nhỏ rất thông minh, nó vẫn có điểm mù: Nó không tự biết một phép LEFT JOIN là hoàn toàn vô nghĩa nếu bạn không lấy bất kỳ cột nào từ bảng đó.",
+    "formulaOrSyntax": "-- Công cụ mở rộng: Apache Arrow (Vectorized Execution)\nArrow giúp chuyển dữ liệu giữa Python và Database trực tiếp trên RAM siêu tốc mà không cần ép kiểu (Zero-copy).\nTuy nhiên, việc xử lý trọn vẹn ngay bên trong Database (In-DB Execution) bằng các lệnh SQL chuẩn vẫn luôn ưu việt và tốn ít tài nguyên nhất.",
+    "pitfall": "Ngồi tốn hàng giờ tinh chỉnh thứ tự JOIN theo các mẹo vặt trên mạng, trong khi thực ra chỉ cần xóa hẳn câu LEFT JOIN vô dụng đó đi là tốc độ tăng vọt. Việc xóa các câu lệnh thừa là trách nhiệm của kỹ sư, không phải của công cụ.",
+    "sourceLink": { "text": "DuckDB Vectorized Execution", "url": "https://duckdb.org/why_duckdb" }
   }
 ]

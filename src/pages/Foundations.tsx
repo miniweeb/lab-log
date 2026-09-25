@@ -98,11 +98,11 @@ export default function Foundations() {
   }
 
   const handleResetDefault = () => {
-    if (confirm('Khôi phục danh sách 34 khái niệm gốc theo đúng thứ tự logic (1 - 34)? Mọi thay đổi trước đó sẽ được làm mới.')) {
+    if (confirm('Khôi phục danh sách khái niệm gốc theo đúng thứ tự logic. Mọi thay đổi trước đó sẽ được làm mới.')) {
       setConcepts(DEFAULT_CONCEPTS)
       setPage(1)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_CONCEPTS))
-      alert('Đã khôi phục danh sách chuẩn từ 1 đến 34.')
+      alert('Đã khôi phục danh sách chuẩn.')
     }
   }
 

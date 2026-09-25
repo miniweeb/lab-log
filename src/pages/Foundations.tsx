@@ -3,7 +3,7 @@ import { Empty } from '../components/ui'
 import { DEFAULT_CONCEPTS, type ConceptItem } from '../lib/concepts'
 
 export type { ConceptItem }   // giữ nguyên đường import cũ cho các file khác
-const STORAGE_KEY = 'lab-log:foundations:concepts'
+const STORAGE_KEY = 'lab-log:foundations:concepts_v2'
 const MASTERED_KEY = 'lab-log:foundations:mastered'
 
 function readStoredConcepts(): ConceptItem[] {

@@ -598,5 +598,65 @@ export const DEFAULT_CONCEPTS: ConceptItem[] = [
     "formulaOrSyntax": "-- Công cụ mở rộng: Apache Arrow (Vectorized Execution)\nArrow giúp chuyển dữ liệu giữa Python và Database trực tiếp trên RAM siêu tốc mà không cần ép kiểu (Zero-copy).\nTuy nhiên, việc xử lý trọn vẹn ngay bên trong Database (In-DB Execution) bằng các lệnh SQL chuẩn vẫn luôn ưu việt và tốn ít tài nguyên nhất.",
     "pitfall": "Ngồi tốn hàng giờ tinh chỉnh thứ tự JOIN theo các mẹo vặt trên mạng, trong khi thực ra chỉ cần xóa hẳn câu LEFT JOIN vô dụng đó đi là tốc độ tăng vọt. Việc xóa các câu lệnh thừa là trách nhiệm của kỹ sư, không phải của công cụ.",
     "sourceLink": { "text": "DuckDB Vectorized Execution", "url": "https://duckdb.org/why_duckdb" }
+  },
+  {
+    "id": "c_dbt_t_layer_boundary",
+    "subject": "Pipeline Lifecycle",
+    "term": "54. Công cụ dbt (Data Build Tool) & Ranh giới chữ 'T'",
+    "pronounceOrType": "Định vị công cụ trong kiến trúc ELT",
+    "definition": "dbt (Data Build Tool) là tiêu chuẩn công nghiệp hiện nay để tự động hóa việc viết SQL. Dù được thần thánh hóa, bản chất dbt chỉ đảm nhận duy nhất chữ 'T' (Transformation - Biến đổi) trong mô hình ELT. Nó không tự đi tải file từ API (Extract), cũng không nạp dữ liệu vật lý vào ổ cứng (Load). dbt chỉ tiếp quản công việc khi dữ liệu đã nằm yên ở một nơi có thể chạy truy vấn SQL. Trong dbt, mỗi bảng dữ liệu được đại diện bằng đúng 1 file SQL chứa duy nhất 1 câu lệnh SELECT.",
+    "formulaOrSyntax": "-- Công cụ mở rộng: dbt Core (Mã nguồn mở) vs. dbt Cloud\nĐánh đổi: dbt Cloud có giao diện đẹp, tự lên lịch chạy (scheduler), dễ dùng cho team nhỏ, nhưng cái giá phải trả là chi phí rất đắt đỏ khi team phình to. dbt Core hoàn toàn miễn phí, kỹ sư kiểm soát được mọi thứ trong mã nguồn, đổi lại bạn phải tự xây dựng hạ tầng máy chủ và tự dùng công cụ khác (như Airflow) để lên lịch chạy.",
+    "pitfall": "Lầm tưởng dbt có thể thay thế toàn bộ hệ thống Data Pipeline. Bạn vẫn phải tự viết các đoạn code Python để xử lý việc tải file, chặn lỗi đường truyền hay dọn rác hệ điều hành. Dùng sai công cụ cho phần Extract/Load sẽ khiến dự án rối tung.",
+    "sourceLink": { "text": "dbt About Models", "url": "https://docs.getdbt.com/docs/build/models" }
+  },
+  {
+    "id": "c_auto_dag_generation",
+    "subject": "Reliability & Ops",
+    "term": "55. Tự động vẽ Bản đồ phụ thuộc (DAG) với hàm ref()",
+    "pronounceOrType": "Cách hệ thống tự biết ai chạy trước, ai chạy sau",
+    "definition": "Trong một kho dữ liệu có hàng trăm bảng, bảng B được tính ra từ bảng A, bảng C lấy số từ bảng B. Bản đồ quy định thứ tự này gọi là DAG (Đồ thị có hướng không chu trình). Thay vì kỹ sư phải nhớ và tự viết cấu hình 'Chạy A rồi mới chạy B', dbt đưa ra một quy tắc: Bên trong câu SQL, không bao giờ được gõ tên bảng trực tiếp. Phải dùng hàm `{{ ref('ten_bang') }}`. Khi biên dịch, dbt sẽ quét các hàm ref() này, tự động vẽ ra DAG và tự biết phải dựng bảng cha trước, bảng con sau.",
+    "formulaOrSyntax": "-- Công cụ mở rộng: dbt DAG vs. Airflow Task Dependencies\nTrong Airflow, bạn phải nối đồ thị bằng tay (ví dụ: Task_A >> Task_B).\nĐánh đổi: Nối bằng tay thì dễ bao quát các task phi-SQL (gửi email, gọi API), nhưng khi file SQL thay đổi logic, kỹ sư quên cập nhật file cấu hình Airflow là thứ tự chạy sai bét. Hàm ref() của dbt lấy đồ thị trực tiếp từ mã nguồn SQL nên không bao giờ bị lệch (drift), đổi lại dbt sẽ giấu câu lệnh SQL thật sự đằng sau một bước biên dịch, gây khó chịu khi debug.",
+    "pitfall": "Do thói quen, kỹ sư gõ thẳng tên schema và tên bảng vật lý vào file dbt model thay vì dùng hàm ref(). Lệnh SQL vẫn chạy thành công hôm nay, nhưng model đó lặng lẽ rơi ra khỏi DAG. Thứ tự chạy ngày mai sẽ phụ thuộc vào may rủi.",
+    "sourceLink": { "text": "dbt ref function", "url": "https://docs.getdbt.com/reference/dbt-jinja-functions/ref" }
+  },
+  {
+    "id": "c_executable_data_contracts",
+    "subject": "Quality Gate",
+    "term": "56. Kiểm thử tự động (dbt Tests) & Căn bệnh Nhờn cảnh báo",
+    "pronounceOrType": "Biến Giao ước dữ liệu thành Bộ bảo vệ chủ động",
+    "definition": "Để đảm bảo dữ liệu không bị rỗng, không bị trùng lặp hay sai định dạng, dbt cho phép viết các bài Kiểm thử (Tests) trực tiếp vào file cấu hình YAML. Lúc chạy, dbt biên dịch chúng thành các câu lệnh SELECT; nếu trả về > 0 dòng, bài test thất bại. Sự tinh tế nằm ở chỗ phân loại mức độ nghiêm trọng (Severity). Nếu một loại rác (như thiếu ID khách hàng do mua ẩn danh) vốn dĩ đã được ghi nhận trong Giao ước dữ liệu với tỷ lệ 0.05%, bạn phải đặt nó là `warn` (cảnh báo) chứ không phải `error` (lỗi).",
+    "formulaOrSyntax": "-- Công cụ mở rộng: dbt Tests vs. Great Expectations (GE)\nGE là thư viện khổng lồ giúp kiểm tra phân phối thống kê, định dạng regex phức tạp.\nĐánh đổi: Cài cắm GE làm hệ thống nặng nề và phức tạp hóa quá trình CI/CD. Cố nhồi nhét hàng chục bài test không mang ý nghĩa nghiệp vụ sinh tử sẽ làm pipeline đỏ rực mỗi ngày. Kỹ sư sẽ sinh ra tâm lý 'Nhờn cảnh báo' (Alert Fatigue) và phớt lờ luôn cả những cảnh báo chí mạng. Nguyên tắc: 'Warn' là để theo dõi, 'Error' là để dừng dây chuyền.",
+    "pitfall": "Tư duy đòi hỏi sự hoàn hảo 100%, thiết lập `error` cho mọi sự sai lệch dữ liệu dù là nhỏ nhất. Pipeline sập liên tục vì những dữ liệu rác thông thường. Một bộ Test lúc nào cũng báo đỏ là một bộ Test bị cả công ty đưa vào thùng rác.",
+    "sourceLink": { "text": "dbt Data Tests", "url": "https://docs.getdbt.com/docs/build/data-tests" }
+  },
+  {
+    "id": "c_data_catalog_descriptions",
+    "subject": "Pipeline Lifecycle",
+    "term": "57. Từ điển Dữ liệu (Data Catalog) & Nghệ thuật viết Mô tả",
+    "pronounceOrType": "Minh bạch hóa kho dữ liệu cho người dùng cuối",
+    "definition": "Khi người lạ hoặc nhân viên mới nhìn vào kho dữ liệu, họ sẽ hỏi 3 câu: Bảng này chứa gì? Dữ liệu có tin được không? Gặp lỗi thì chửi ai? Data Catalog (Từ điển dữ liệu) là một trang web sinh ra để trả lời 3 câu đó. Công cụ (như lệnh `dbt docs generate`) sẽ tự gom cấu trúc bảng, danh sách Tests. Nhưng phần hồn — Ý nghĩa thực sự của từng cột — thì con người phải tự viết. Dòng đầu tiên của mô tả bảng bắt buộc phải định nghĩa Độ hạt (Grain): 'Một dòng của bảng này đại diện cho cái gì?'.",
+    "formulaOrSyntax": "-- Công cụ mở rộng: dbt Docs vs. DataHub / Atlan\ndbt Docs sinh ra một trang web tĩnh miễn phí đi kèm với project.\nĐánh đổi: dbt Docs chỉ xem được dữ liệu bên trong nội bộ project dbt đó. Các bản thương mại (DataHub, Atlan) bao quát toàn bộ tài sản dữ liệu của cả công ty, phân quyền truy cập, hiển thị lịch sử sử dụng, nhưng tốn nhiều tiền mua bản quyền và duy trì máy chủ. Nếu chưa viết nổi mô tả cho tử tế ở dbt, mua tool xịn cũng vô dụng.",
+    "pitfall": "Viết mô tả theo kiểu nhại lại tên cột (Ví dụ cột `order_date` thì ghi mô tả là 'Ngày đặt hàng'). Một dòng mô tả vô hồn khiến catalog trông có vẻ xịn nhưng người đọc không thu được giá trị gì. Mô tả đúng phải mang theo quyết định thiết kế, ràng buộc hoặc cảnh báo (Ví dụ: 'Tuyệt đối không cộng dồn doanh thu qua các loại tiền tệ khác nhau').",
+    "sourceLink": { "text": "dbt Docs", "url": "https://docs.getdbt.com/docs/collaborate/explore-projects" }
+  },
+  {
+    "id": "c_lineage_limitations",
+    "subject": "Reliability & Ops",
+    "term": "58. Giới hạn của Tool: Đứt gãy Nguồn gốc Dữ liệu (Lineage)",
+    "pronounceOrType": "Phân tích bán kính ảnh hưởng khi có yêu cầu thay đổi",
+    "definition": "Nguồn gốc dữ liệu (Lineage) có 3 tầng. 1. Mức Bảng (Table-level): Hiển thị bảng nào nuôi bảng nào (DAG của dbt tự làm được). 2. Mức Cột (Column-level): Truy vết sự thay đổi của một cột qua từng câu SQL. 3. Mức Dòng (Row-level): Lần chạy nào đã nạp dòng dữ liệu này. Khi đối tác thông báo sẽ xóa cột X, Lineage mức Bảng sẽ báo động đỏ: 'Cả 5 bảng phía sau sẽ sập'. Nhưng nếu tự lần tay ở mức Cột, bạn nhận ra chỉ có 2 bảng thực sự chạm vào cột X, 3 bảng còn lại không hề SELECT cột đó.",
+    "formulaOrSyntax": "-- Công cụ mở rộng: Trích xuất Lineage mức cột tự động\nCác catalog thương mại hoặc dbt Explorer trả phí dùng công nghệ phân tích cú pháp SQL (AST Parsing) để tự động vẽ Lineage mức Cột.\nĐánh đổi: Đổi tiền lấy sự tự động hóa. Tuy nhiên, dù công nghệ đắt tiền đến mấy cũng KHÔNG thể cho bạn Lineage mức Dòng. Việc dán nhãn `_run_id` và `_data_date` để truy vết xem lần chạy pipeline nào đã sinh ra dòng dữ liệu cụ thể bắt buộc phải do kỹ sư tự thiết kế bằng tay ngay từ lúc nạp dữ liệu.",
+    "pitfall": "Phụ thuộc 100% vào báo cáo rủi ro mức Bảng của dbt. Hoảng sợ báo cáo với sếp rằng hệ thống sẽ sập toàn diện khi nguồn xóa 1 cột nhỏ, trong khi thực tế chỉ tốn 20 phút để sửa lại 2 Model bị ảnh hưởng trực tiếp.",
+    "sourceLink": { "text": "dbt Understand Node Lineage", "url": "https://docs.getdbt.com/docs/collaborate/explore-projects#understand-node-lineage" }
+  },
+  {
+    "id": "c_non_additive_measures",
+    "subject": "Data Modeling",
+    "term": "59. Bẫy Thiết kế Báo cáo: Tính cộng dồn (Additivity) của Tỷ lệ",
+    "pronounceOrType": "Sai lầm phá nát số liệu tài chính",
+    "definition": "Đứng trước yêu cầu tạo bảng báo cáo tổng hợp (Data Mart), điểm chết người nhất là xác định Tính cộng dồn (Additivity). Các Thước đo (Measures) như Số lượng bán, Doanh thu có thể cộng dồn tùy ý qua các tháng, các vùng. Nhưng các Thước đo Tỷ lệ (như Tỷ lệ trả hàng - Return Rate) thì TUYỆT ĐỐI KHÔNG được cộng dồn hay tính trung bình. Tỷ lệ trả hàng của cả khu vực Châu Á không bao giờ là trung bình cộng tỷ lệ của từng cửa hàng (trừ phi cửa hàng nào cũng bán ra số lượng y hệt nhau).",
+    "formulaOrSyntax": "-- Công cụ mở rộng: dbt Semantic Layer / Metric Store (Cube.dev)\nCác hệ thống lớn dùng Semantic Layer để định nghĩa công thức tính Tỷ lệ ở một máy chủ trung tâm. BI tool gọi vào sẽ tự động tính đúng.\nĐánh đổi: Thêm Semantic Layer làm kiến trúc cồng kềnh và tăng chi phí. Ở tầng Data Warehouse thuần túy, nguyên tắc sắt đá là: Đừng bao giờ lưu sẵn Tỷ lệ vào bảng. Hãy lưu Tử số và Mẫu số riêng biệt (vd: Tổng hàng bán, Tổng hàng trả), rồi ép người dùng hoặc BI Tool (Tableau, PowerBI) tự làm phép chia tại thời điểm xem báo cáo.",
+    "pitfall": "Tính sẵn cột `return_rate` và lưu chết vào Data Mart. Nhân viên phân tích kéo thả cột này vào BI Tool và chọn hàm `AVERAGE`, hệ thống tính ra một tỷ lệ trung bình vô nghĩa, ra các quyết định kinh doanh sai lệch hoàn toàn mà không ai hay biết.",
+    "sourceLink": { "text": "Kimball Dimensional Modeling", "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/" }
   }
 ]
